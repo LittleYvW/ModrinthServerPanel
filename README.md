@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Modrinth Server Panel
 
-## Getting Started
+Minecraft 服务器模组管理面板，支持从 Modrinth 下载和管理模组。
 
-First, run the development server:
+## 功能特性
+
+- **访客模式**: 默认访客访问，可查看和下载必需的双端模组
+- **管理员模式**: 密码保护的管理界面
+- **模组分类**: 自动识别双端模组和服务端模组
+- **Modrinth 集成**: 直接搜索和下载 Modrinth 上的模组
+- **深色主题**: Modrinth 风格深色界面
+
+## 技术栈
+
+- Next.js 14 + TypeScript
+- TailwindCSS
+- shadcn/ui
+- JSON 文件存储
+
+## 快速开始
+
+### 开发模式
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+访问 http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 生产构建
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## 使用说明
 
-To learn more about Next.js, take a look at the following resources:
+### 默认管理员密码
+- 用户名: admin
+- 密码: admin
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 配置服务端
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. 点击右上角"管理员登录"
+2. 输入默认密码 `admin`
+3. 在"服务端配置"标签页设置:
+   - 服务端路径 (如 `D:\MinecraftServer`)
+   - Minecraft 版本 (如 `1.20.1`)
+   - 模组加载器类型 (Fabric/Forge/Quilt/NeoForge)
+   - 加载器版本 (可选)
 
-## Deploy on Vercel
+### 添加模组
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. 切换到"添加模组"标签页
+2. 搜索想要的模组
+3. 点击"添加"选择兼容版本
+4. 模组会自动下载到服务端的 `mods` 文件夹
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 访客下载
+
+访客模式下会显示所有**双端必需模组**的列表，玩家可以:
+- 单独下载每个模组
+- 批量下载所有必需模组
+
+## 数据存储
+
+所有数据存储在 `data/` 目录下:
+- `config.json` - 服务端配置
+- `mods.json` - 已安装模组列表
+- `auth.json` - 管理员密码
+
+## 模组环境分类
+
+| 分类 | 说明 | 访客可见 |
+|-----|------|---------|
+| 双端 | 需要在客户端和服务端同时安装 | ✅ 可下载 |
+| 仅服务端 | 只需要在服务端安装 | ❌ 仅显示名称 |
+| 仅客户端 | 只需要在客户端安装 | ❌ 隐藏 |
+
+## 注意事项
+
+- 确保服务端路径有写入权限
+- 模组会下载到 `{服务端路径}/mods/` 目录
+- 删除模组会同时删除文件

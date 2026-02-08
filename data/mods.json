@@ -1,0 +1,18 @@
+[
+  {
+    "id": "23MovWyi",
+    "slug": "improved-mobs",
+    "name": "Improved Mobs",
+    "versionId": "diNLFI6L",
+    "filename": "improvedmobs-1.21.1-1.15.2-neoforge.jar",
+    "environment": {
+      "client": "optional",
+      "server": "required"
+    },
+    "category": "server-only",
+    "installedAt": "2026-02-08T12:37:59.002Z",
+    "iconUrl": "https://cdn.modrinth.com/data/23MovWyi/2633906867d1bc82ea96c421a6de165e3bf8ae01_96.webp",
+    "description": "Harder mobs for increased difficulty",
+    "versionNumber": "1.21.1-1.15.2-neoforge"
+  }
+]

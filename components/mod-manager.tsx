@@ -5,8 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
+import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Mod {
   id: string;
@@ -35,6 +42,7 @@ export function ModManager() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [updatingCategory, setUpdatingCategory] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMods();
@@ -70,6 +78,24 @@ export function ModManager() {
     setRefreshing(true);
     await fetchMods();
     setRefreshing(false);
+  };
+
+  const updateModCategory = async (id: string, category: 'both' | 'server-only' | 'client-only') => {
+    setUpdatingCategory(id);
+    try {
+      const res = await fetch('/api/mods', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, category }),
+      });
+      if (res.ok) {
+        await fetchMods();
+      }
+    } catch (error) {
+      console.error('Failed to update category:', error);
+    } finally {
+      setUpdatingCategory(null);
+    }
   };
 
   const getCategoryIcon = (category: string) => {
@@ -109,6 +135,62 @@ export function ModManager() {
       default:
         return '未知';
     }
+  };
+
+  const CategorySelector = ({ mod }: { mod: Mod }) => {
+    const categories: { value: 'both' | 'server-only' | 'client-only'; label: string; icon: React.ReactNode }[] = [
+      { value: 'both', label: '双端', icon: <Users className="w-3 h-3" /> },
+      { value: 'server-only', label: '仅服务端', icon: <Server className="w-3 h-3" /> },
+      { value: 'client-only', label: '仅客户端', icon: <Monitor className="w-3 h-3" /> },
+    ];
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={updatingCategory === mod.id}
+            className={cn(
+              'h-7 px-2 text-xs gap-1',
+              getCategoryColor(mod.category)
+            )}
+          >
+            {updatingCategory === mod.id ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <>
+                {getCategoryIcon(mod.category)}
+                <span>{getCategoryLabel(mod.category)}</span>
+                <Settings2 className="w-3 h-3 ml-1 opacity-50" />
+              </>
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="bg-[#1a1a1a] border-[#2a2a2a]">
+          {categories.map((cat) => (
+            <DropdownMenuItem
+              key={cat.value}
+              onClick={() => updateModCategory(mod.id, cat.value)}
+              className={cn(
+                'text-sm cursor-pointer',
+                mod.category === cat.value
+                  ? 'bg-[#00d17a]/10 text-[#00d17a]'
+                  : 'text-[#a0a0a0] hover:text-white hover:bg-[#262626]'
+              )}
+            >
+              <div className="flex items-center gap-2">
+                {cat.icon}
+                <span>{cat.label}</span>
+                {mod.category === cat.value && (
+                  <Check className="w-3 h-3 ml-2" />
+                )}
+              </div>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
   };
 
   const ModList = ({ mods, category }: { mods: Mod[]; category: string }) => (
@@ -173,6 +255,8 @@ export function ModManager() {
                       <Badge variant="outline" className="text-xs border-[#2a2a2a] text-[#707070]">
                         v{mod.versionNumber || '?'}
                       </Badge>
+                      {/* 分类选择器 */}
+                      <CategorySelector mod={mod} />
                     </div>
                   </div>
 

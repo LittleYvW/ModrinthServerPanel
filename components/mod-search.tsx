@@ -119,10 +119,12 @@ export function ModSearch() {
   };
 
   const getEnvironmentBadge = (client: string, server: string) => {
-    // 优先级: 服务端 > 客户端 > 双端
-    if (server === 'required') {
+    // 基于 API 数据的稳定判断
+    if (client === 'required' && server === 'required') {
+      return <Badge className="bg-[#00d17a]/20 text-[#00d17a] border-0">双端</Badge>;
+    } else if (server === 'required' && client !== 'required') {
       return <Badge className="bg-[#1b8fff]/20 text-[#1b8fff] border-0">服务端</Badge>;
-    } else if (client === 'required') {
+    } else if (client === 'required' && server !== 'required') {
       return <Badge className="bg-[#9b59b6]/20 text-[#9b59b6] border-0">客户端</Badge>;
     }
     return <Badge variant="outline" className="border-[#2a2a2a] text-[#707070]">可选</Badge>;

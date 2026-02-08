@@ -84,17 +84,20 @@ export function analyzeEnvironment(data: any): {
   const client = data.client_support || data.client_side || 'required';
   const server = data.server_support || data.server_side || 'required';
   
-  // 确定分类
-  // 优先级: server-only > client-only > both
+  // 确定分类 - 基于 API 返回的实际数据
   let category: 'both' | 'server-only' | 'client-only';
   
-  if (server === 'required') {
-    // 优先标记为服务端模组
+  if (client === 'required' && server === 'required') {
+    // 双端必需
+    category = 'both';
+  } else if (server === 'required' && client !== 'required') {
+    // 仅服务端必需
     category = 'server-only';
-  } else if (client === 'required') {
+  } else if (client === 'required' && server !== 'required') {
+    // 仅客户端必需
     category = 'client-only';
   } else {
-    // 默认分类
+    // 默认分类（可选情况下）
     category = 'both';
   }
   

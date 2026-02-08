@@ -148,3 +148,48 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
+// 更新模组分类（PATCH 方法）
+export async function PATCH(request: NextRequest) {
+  try {
+    const { id, category } = await request.json();
+    
+    if (!id || !category) {
+      return NextResponse.json(
+        { error: 'Missing id or category' },
+        { status: 400 }
+      );
+    }
+    
+    // 验证 category 值
+    const validCategories = ['both', 'server-only', 'client-only'];
+    if (!validCategories.includes(category)) {
+      return NextResponse.json(
+        { error: 'Invalid category. Must be one of: both, server-only, client-only' },
+        { status: 400 }
+      );
+    }
+    
+    const mods = getMods();
+    const modIndex = mods.findIndex(m => m.id === id);
+    
+    if (modIndex === -1) {
+      return NextResponse.json(
+        { error: 'Mod not found' },
+        { status: 404 }
+      );
+    }
+    
+    // 更新分类
+    mods[modIndex].category = category as 'both' | 'server-only' | 'client-only';
+    saveMods(mods);
+    
+    return NextResponse.json({ success: true, mod: mods[modIndex] });
+  } catch (error) {
+    console.error('Update category error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update category' },
+      { status: 500 }
+    );
+  }
+}

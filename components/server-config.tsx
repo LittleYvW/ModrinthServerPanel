@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { FolderOpen, Save, Check, AlertCircle, Server } from 'lucide-react';
+import { FolderOpen, Save, Check, AlertCircle, Server, Eye } from 'lucide-react';
 
 type Loader = 'fabric' | 'forge' | 'quilt' | 'neoforge';
 
@@ -16,6 +16,7 @@ interface Config {
   minecraftVersion: string;
   loader: Loader;
   loaderVersion: string;
+  showServerOnlyMods: boolean;
 }
 
 const loaders: { value: Loader; label: string; color: string }[] = [
@@ -31,6 +32,7 @@ export function ServerConfigPanel() {
     minecraftVersion: '',
     loader: 'fabric',
     loaderVersion: '',
+    showServerOnlyMods: true,
   });
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -172,6 +174,46 @@ export function ServerConfigPanel() {
             placeholder="例如: 0.14.22 (Fabric) 或 47.1.0 (Forge)"
             className="bg-[#1a1a1a] border-[#2a2a2a] text-white placeholder:text-[#505050] focus:border-[#00d17a] focus:ring-[#00d17a]"
           />
+        </div>
+
+        {/* 访客模式显示设置 */}
+        <div className="space-y-3 pt-2 border-t border-[#2a2a2a]">
+          <Label className="flex items-center gap-2 text-white">
+            <Eye className="w-4 h-4 text-[#00d17a]" />
+            访客模式显示设置
+          </Label>
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant={config.showServerOnlyMods ? 'default' : 'outline'}
+              onClick={() => setConfig({ ...config, showServerOnlyMods: true })}
+              className={`
+                ${config.showServerOnlyMods 
+                  ? 'bg-[#00d17a] text-black hover:bg-[#00b86b]' 
+                  : 'border-[#2a2a2a] text-[#a0a0a0] hover:border-[#00d17a] hover:text-white'
+                }
+              `}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              显示纯服务端模组
+            </Button>
+            <Button
+              type="button"
+              variant={!config.showServerOnlyMods ? 'default' : 'outline'}
+              onClick={() => setConfig({ ...config, showServerOnlyMods: false })}
+              className={`
+                ${!config.showServerOnlyMods 
+                  ? 'bg-[#00d17a] text-black hover:bg-[#00b86b]' 
+                  : 'border-[#2a2a2a] text-[#a0a0a0] hover:border-[#00d17a] hover:text-white'
+                }
+              `}
+            >
+              隐藏纯服务端模组
+            </Button>
+          </div>
+          <p className="text-xs text-[#707070]">
+            控制访客在首页是否能看到纯服务端模组的列表
+          </p>
         </div>
 
         {/* 保存按钮 */}

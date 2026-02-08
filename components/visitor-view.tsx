@@ -29,8 +29,13 @@ interface CategorizedMods {
   clientOnly: Mod[];
 }
 
+interface Config {
+  showServerOnlyMods: boolean;
+}
+
 export function VisitorView() {
   const [mods, setMods] = useState<CategorizedMods>({ both: [], serverOnly: [], clientOnly: [] });
+  const [config, setConfig] = useState<Config>({ showServerOnlyMods: true });
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
 
@@ -43,6 +48,9 @@ export function VisitorView() {
       const res = await fetch('/api/mods');
       const data = await res.json();
       setMods(data.categorized);
+      if (data.config) {
+        setConfig(data.config);
+      }
     } catch (error) {
       console.error('Failed to fetch mods:', error);
     } finally {
@@ -188,7 +196,7 @@ export function VisitorView() {
       </Card>
 
       {/* 服务端模组信息 */}
-      {mods.serverOnly.length > 0 && (
+      {config.showServerOnlyMods && mods.serverOnly.length > 0 && (
         <Card className="border-[#2a2a2a] bg-[#151515]/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-[#a0a0a0]">

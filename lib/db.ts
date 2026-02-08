@@ -17,6 +17,7 @@ const defaultConfig: ServerConfig = {
   minecraftVersion: '',
   loader: 'fabric',
   loaderVersion: '',
+  showServerOnlyMods: true,
 };
 
 // 默认管理员密码 (admin)
@@ -45,6 +46,7 @@ export interface ServerConfig {
   minecraftVersion: string;
   loader: 'fabric' | 'forge' | 'quilt' | 'neoforge';
   loaderVersion: string;
+  showServerOnlyMods?: boolean;
 }
 
 export function getConfig(): ServerConfig {

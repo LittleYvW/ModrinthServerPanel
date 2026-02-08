@@ -9,12 +9,13 @@ import { getConfig } from '@/lib/db';
 export async function GET() {
   try {
     const mods = getMods();
+    const config = getConfig();
     const categorized = {
       both: mods.filter(m => m.category === 'both'),
       serverOnly: mods.filter(m => m.category === 'server-only'),
       clientOnly: mods.filter(m => m.category === 'client-only'),
     };
-    return NextResponse.json({ mods, categorized });
+    return NextResponse.json({ mods, categorized, config: { showServerOnlyMods: config.showServerOnlyMods ?? true } });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to get mods' },

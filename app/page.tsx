@@ -28,7 +28,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#0d0d0d]">
       {/* 顶部导航 */}
-      <header className="border-b border-[#2a2a2a] bg-[#0d0d0d]/80 backdrop-blur sticky top-0 z-40">
+      <header className="border-b border-[#2a2a2a] bg-[#0d0d0d]/80 backdrop-blur sticky top-0 z-40 animate-fade-in-down">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
@@ -93,11 +93,13 @@ export default function Home() {
 
       {/* 主内容区 */}
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {isAdmin ? (
-          <AdminView onLogout={handleLogout} />
-        ) : (
-          <VisitorView />
-        )}
+        <div className="animate-fade-in-up duration-500">
+          {isAdmin ? (
+            <AdminView onLogout={handleLogout} />
+          ) : (
+            <VisitorView />
+          )}
+        </div>
       </main>
 
       {/* 底部 */}

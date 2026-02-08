@@ -214,7 +214,7 @@ export function ModManager() {
   };
 
   const ModList = ({ mods, category }: { mods: Mod[]; category: string }) => (
-    <Card className="border-[#2a2a2a] bg-[#151515]">
+    <Card className="border-[#2a2a2a] bg-[#151515] animate-fade-in-up">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base text-white">
           {getCategoryIcon(category)}
@@ -235,15 +235,16 @@ export function ModManager() {
         ) : (
           <ScrollArea className="h-[300px]">
             <div className="space-y-2">
-              {mods.map((mod) => (
+              {mods.map((mod, index) => (
                 <div
                   key={mod.id}
                   className={cn(
-                    'flex items-center gap-3 p-3 rounded-lg transition-colors group',
+                    'flex items-center gap-3 p-3 rounded-lg transition-all duration-250 ease-standard group',
                     mod.enabled !== false
-                      ? 'bg-[#1a1a1a] hover:bg-[#1f1f1f]'
+                      ? 'bg-[#1a1a1a] hover:bg-[#1f1f1f] hover:translate-x-1'
                       : 'bg-[#1a1a1a]/50 opacity-60'
                   )}
+                  style={{ animationDelay: `${index * 0.03}s` }}
                 >
                   {/* 图标 */}
                   <div className="w-10 h-10 rounded bg-[#262626] flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -292,10 +293,10 @@ export function ModManager() {
                     onClick={() => toggleMod(mod.id)}
                     disabled={toggling === mod.id}
                     className={cn(
-                      'h-8 w-8 p-0',
+                      'h-8 w-8 p-0 transition-all duration-200 ease-spring',
                       mod.enabled !== false
-                        ? 'text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/10'
-                        : 'text-[#707070] hover:text-[#a0a0a0] hover:bg-[#2a2a2a]'
+                        ? 'text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/10 hover:scale-110'
+                        : 'text-[#707070] hover:text-[#a0a0a0] hover:bg-[#2a2a2a] hover:scale-110'
                     )}
                     title={mod.enabled !== false ? '点击禁用' : '点击启用'}
                   >

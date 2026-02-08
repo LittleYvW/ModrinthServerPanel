@@ -127,7 +127,7 @@ export function VisitorView() {
       )}
 
       {/* 双端模组列表 */}
-      <Card className="border-[#2a2a2a] bg-[#151515]">
+      <Card className="border-[#2a2a2a] bg-[#151515] animate-fade-in-up">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
             <Users className="w-5 h-5 text-[#00d17a]" />
@@ -146,10 +146,11 @@ export function VisitorView() {
           ) : (
             <ScrollArea className="h-[400px]">
               <div className="space-y-3">
-                {mods.both.map((mod) => (
+                {mods.both.map((mod, index) => (
                   <div
                     key={mod.id}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-[#1a1a1a] hover:bg-[#1f1f1f] transition-colors"
+                    className="flex items-center gap-4 p-3 rounded-lg bg-[#1a1a1a] hover:bg-[#1f1f1f] transition-all duration-250 ease-standard hover:translate-x-1"
+                    style={{ animationDelay: `${index * 0.05}s` }}
                   >
                     {/* 图标 */}
                     <div className="w-12 h-12 rounded-lg bg-[#262626] flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -204,7 +205,7 @@ export function VisitorView() {
 
       {/* 服务端模组信息 */}
       {config.showServerOnlyMods && mods.serverOnly.length > 0 && (
-        <Card className="border-[#2a2a2a] bg-[#151515]/50">
+        <Card className="border-[#2a2a2a] bg-[#151515]/50 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-[#a0a0a0]">
               <Server className="w-5 h-5" />

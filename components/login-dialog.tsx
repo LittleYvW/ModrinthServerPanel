@@ -44,8 +44,8 @@ export function LoginDialog({ onLogin, onCancel }: LoginDialogProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl w-full max-w-md p-6 shadow-2xl">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in duration-300">
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in-scale">
         {/* 标题 */}
         <div className="text-center mb-6">
           <div className="w-16 h-16 rounded-full bg-[#00d17a]/10 flex items-center justify-center mx-auto mb-4">
@@ -59,7 +59,7 @@ export function LoginDialog({ onLogin, onCancel }: LoginDialogProps) {
 
         {/* 错误提示 */}
         {error && (
-          <Alert className="mb-4 bg-[#e74c3c]/10 border-[#e74c3c]/30 text-[#e74c3c]">
+          <Alert className="mb-4 bg-[#e74c3c]/10 border-[#e74c3c]/30 text-[#e74c3c] animate-fade-in-up">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}

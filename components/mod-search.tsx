@@ -28,6 +28,8 @@ interface Version {
   client_support: string;
   server_support: string;
   files: { filename: string; primary: boolean }[];
+  loaders: string[];
+  game_versions: string[];
 }
 
 export function ModSearch() {
@@ -240,7 +242,7 @@ export function ModSearch() {
 
       {/* 版本选择对话框 */}
       <Dialog open={!!selectedMod} onOpenChange={() => setSelectedMod(null)}>
-        <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] max-w-lg">
+        <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] max-w-xl">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
               {selectedMod?.icon_url && (
@@ -272,16 +274,45 @@ export function ModSearch() {
                     key={version.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-[#151515] border border-[#2a2a2a]"
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0 mr-3">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-white">
                           {version.version_number}
                         </span>
                         {getEnvironmentBadge(version.client_support, version.server_support)}
                       </div>
-                      <p className="text-xs text-[#707070] mt-1">
+                      <p className="text-xs text-[#707070] mt-1 truncate">
                         {version.files.find(f => f.primary)?.filename || version.files[0]?.filename}
                       </p>
+                      {/* 加载器和游戏版本元数据 */}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {version.loaders?.map((loader) => (
+                          <Badge
+                            key={loader}
+                            variant="outline"
+                            className="text-[10px] h-5 px-1.5 border-[#00d17a]/30 text-[#00d17a] bg-[#00d17a]/5"
+                          >
+                            {loader}
+                          </Badge>
+                        ))}
+                        {version.game_versions?.slice(0, 3).map((ver) => (
+                          <Badge
+                            key={ver}
+                            variant="outline"
+                            className="text-[10px] h-5 px-1.5 border-[#2a2a2a] text-[#707070]"
+                          >
+                            {ver}
+                          </Badge>
+                        ))}
+                        {version.game_versions?.length > 3 && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] h-5 px-1.5 border-[#2a2a2a] text-[#505050]"
+                          >
+                            +{version.game_versions.length - 3}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <Button
                       size="sm"

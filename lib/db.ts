@@ -78,6 +78,7 @@ export interface Mod {
   iconUrl?: string;
   description?: string;
   versionNumber?: string;
+  enabled?: boolean;    // 模组开关状态，默认为 true
 }
 
 export function getMods(): Mod[] {
@@ -109,7 +110,7 @@ export function getModById(id: string): Mod | undefined {
   return getMods().find(m => m.id === id);
 }
 
-// 获取分类后的模组
+// 获取分类后的模组（所有模组，用于管理界面）
 export function getCategorizedMods() {
   const mods = getMods();
   return {
@@ -117,6 +118,27 @@ export function getCategorizedMods() {
     serverOnly: mods.filter(m => m.category === 'server-only'),
     clientOnly: mods.filter(m => m.category === 'client-only'),
   };
+}
+
+// 获取启用的分类模组（用于访客界面）
+export function getEnabledCategorizedMods() {
+  const mods = getMods().filter(m => m.enabled !== false);
+  return {
+    both: mods.filter(m => m.category === 'both'),
+    serverOnly: mods.filter(m => m.category === 'server-only'),
+    clientOnly: mods.filter(m => m.category === 'client-only'),
+  };
+}
+
+// 切换模组启用状态
+export function toggleModEnabled(id: string): Mod | undefined {
+  const mods = getMods();
+  const modIndex = mods.findIndex(m => m.id === id);
+  if (modIndex === -1) return undefined;
+  
+  mods[modIndex].enabled = !mods[modIndex].enabled;
+  saveMods(mods);
+  return mods[modIndex];
 }
 
 // 管理员认证

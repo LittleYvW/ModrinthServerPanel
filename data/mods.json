@@ -13,6 +13,7 @@
     "installedAt": "2026-02-08T12:37:59.002Z",
     "iconUrl": "https://cdn.modrinth.com/data/23MovWyi/2633906867d1bc82ea96c421a6de165e3bf8ae01_96.webp",
     "description": "Harder mobs for increased difficulty",
-    "versionNumber": "1.21.1-1.15.2-neoforge"
+    "versionNumber": "1.21.1-1.15.2-neoforge",
+    "enabled": true
   }
 ]

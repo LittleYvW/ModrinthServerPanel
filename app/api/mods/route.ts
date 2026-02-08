@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMods, addMod, saveMods, Mod } from '@/lib/db';
+import { getMods, addMod, saveMods, Mod, getConfig } from '@/lib/db';
 import { getProject, getProjectVersions, analyzeEnvironment } from '@/lib/modrinth';
 import fs from 'fs';
 import path from 'path';
-import { getConfig } from '@/lib/db';
 
 // 获取模组列表
 export async function GET() {
@@ -92,6 +91,7 @@ export async function POST(request: NextRequest) {
       iconUrl: project.icon_url,
       description: project.description,
       versionNumber: version.version_number,
+      enabled: true, // 新模组默认启用
     };
     
     addMod(mod);
@@ -129,12 +129,17 @@ export async function DELETE(request: NextRequest) {
       );
     }
     
-    // 删除文件
+    // 删除文件（从 mods 和 disabled 目录）
     const config = getConfig();
     if (config.path && mod.filename) {
-      const filePath = path.join(config.path, 'mods', mod.filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      const modsPath = path.join(config.path, 'mods', mod.filename);
+      const disabledPath = path.join(config.path, 'mods', '.disabled', mod.filename);
+      
+      if (fs.existsSync(modsPath)) {
+        fs.unlinkSync(modsPath);
+      }
+      if (fs.existsSync(disabledPath)) {
+        fs.unlinkSync(disabledPath);
       }
     }
     
@@ -190,6 +195,80 @@ export async function PATCH(request: NextRequest) {
     console.error('Update category error:', error);
     return NextResponse.json(
       { error: 'Failed to update category' },
+      { status: 500 }
+    );
+  }
+}
+
+// 切换模组启用状态（PUT 方法）
+export async function PUT(request: NextRequest) {
+  try {
+    const { id } = await request.json();
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Missing mod id' },
+        { status: 400 }
+      );
+    }
+    
+    const mods = getMods();
+    const modIndex = mods.findIndex(m => m.id === id);
+    
+    if (modIndex === -1) {
+      return NextResponse.json(
+        { error: 'Mod not found' },
+        { status: 404 }
+      );
+    }
+    
+    const mod = mods[modIndex];
+    const newEnabled = !mod.enabled;
+    
+    // 移动文件
+    const config = getConfig();
+    if (config.path && mod.filename) {
+      const modsDir = path.join(config.path, 'mods');
+      const disabledDir = path.join(modsDir, '.disabled');
+      const sourcePath = path.join(modsDir, mod.filename);
+      const destPath = path.join(disabledDir, mod.filename);
+      
+      try {
+        if (newEnabled) {
+          // 启用：从 .disabled 移动到 mods
+          if (!fs.existsSync(disabledDir)) {
+            fs.mkdirSync(disabledDir, { recursive: true });
+          }
+          if (fs.existsSync(destPath)) {
+            if (!fs.existsSync(modsDir)) {
+              fs.mkdirSync(modsDir, { recursive: true });
+            }
+            fs.renameSync(destPath, sourcePath);
+          }
+        } else {
+          // 禁用：从 mods 移动到 .disabled
+          if (!fs.existsSync(disabledDir)) {
+            fs.mkdirSync(disabledDir, { recursive: true });
+          }
+          if (fs.existsSync(sourcePath)) {
+            fs.renameSync(sourcePath, destPath);
+          }
+        }
+      } catch (fileError) {
+        console.error('File operation error:', fileError);
+        // 文件操作失败不影响数据库更新
+      }
+    }
+    
+    // 更新状态
+    mods[modIndex].enabled = newEnabled;
+    saveMods(mods);
+    
+    return NextResponse.json({ success: true, mod: mods[modIndex] });
+  } catch (error) {
+    console.error('Toggle mod error:', error);
+    return NextResponse.json(
+      { error: 'Failed to toggle mod' },
       { status: 500 }
     );
   }

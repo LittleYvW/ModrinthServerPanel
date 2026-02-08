@@ -21,6 +21,7 @@ interface Mod {
     client: string;
     server: string;
   };
+  enabled?: boolean;
 }
 
 interface CategorizedMods {
@@ -47,7 +48,13 @@ export function VisitorView() {
     try {
       const res = await fetch('/api/mods');
       const data = await res.json();
-      setMods(data.categorized);
+      // 过滤掉禁用的模组（只显示启用的）
+      const enabledMods = {
+        both: data.categorized.both.filter((m: Mod) => m.enabled !== false),
+        serverOnly: data.categorized.serverOnly.filter((m: Mod) => m.enabled !== false),
+        clientOnly: data.categorized.clientOnly.filter((m: Mod) => m.enabled !== false),
+      };
+      setMods(enabledMods);
       if (data.config) {
         setConfig(data.config);
       }

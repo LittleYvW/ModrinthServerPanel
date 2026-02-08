@@ -27,6 +27,14 @@ export async function GET(request: NextRequest) {
       );
     }
     
+    // 检查模组是否启用
+    if (mod.enabled === false) {
+      return NextResponse.json(
+        { error: 'Mod is disabled' },
+        { status: 403 }
+      );
+    }
+    
     const config = getConfig();
     if (!config.path) {
       return NextResponse.json(
@@ -72,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
     
     const mods = getMods();
-    const bothMods = mods.filter(m => m.category === 'both');
+    const bothMods = mods.filter(m => m.category === 'both' && m.enabled !== false);
     
     // 收集所有文件路径
     const files: { name: string; path: string }[] = [];

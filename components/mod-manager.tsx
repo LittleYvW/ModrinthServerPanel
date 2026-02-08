@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check } from 'lucide-react';
+import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check, Power, PowerOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Mod {
@@ -29,6 +29,7 @@ interface Mod {
     server: string;
   };
   installedAt: string;
+  enabled?: boolean;
 }
 
 interface CategorizedMods {
@@ -43,6 +44,7 @@ export function ModManager() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingCategory, setUpdatingCategory] = useState<string | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMods();
@@ -95,6 +97,24 @@ export function ModManager() {
       console.error('Failed to update category:', error);
     } finally {
       setUpdatingCategory(null);
+    }
+  };
+
+  const toggleMod = async (id: string) => {
+    setToggling(id);
+    try {
+      const res = await fetch('/api/mods', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        await fetchMods();
+      }
+    } catch (error) {
+      console.error('Failed to toggle mod:', error);
+    } finally {
+      setToggling(null);
     }
   };
 
@@ -218,7 +238,12 @@ export function ModManager() {
               {mods.map((mod) => (
                 <div
                   key={mod.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-[#1a1a1a] hover:bg-[#1f1f1f] transition-colors group"
+                  className={cn(
+                    'flex items-center gap-3 p-3 rounded-lg transition-colors group',
+                    mod.enabled !== false
+                      ? 'bg-[#1a1a1a] hover:bg-[#1f1f1f]'
+                      : 'bg-[#1a1a1a]/50 opacity-60'
+                  )}
                 >
                   {/* 图标 */}
                   <div className="w-10 h-10 rounded bg-[#262626] flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -259,6 +284,29 @@ export function ModManager() {
                       <CategorySelector mod={mod} />
                     </div>
                   </div>
+
+                  {/* 开关按钮 */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => toggleMod(mod.id)}
+                    disabled={toggling === mod.id}
+                    className={cn(
+                      'h-8 w-8 p-0',
+                      mod.enabled !== false
+                        ? 'text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/10'
+                        : 'text-[#707070] hover:text-[#a0a0a0] hover:bg-[#2a2a2a]'
+                    )}
+                    title={mod.enabled !== false ? '点击禁用' : '点击启用'}
+                  >
+                    {toggling === mod.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : mod.enabled !== false ? (
+                      <Power className="w-4 h-4" />
+                    ) : (
+                      <PowerOff className="w-4 h-4" />
+                    )}
+                  </Button>
 
                   {/* 删除按钮 */}
                   <AlertDialog>

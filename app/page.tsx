@@ -4,9 +4,12 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Download, Loader2 } from 'lucide-react';
 import { VisitorView } from '@/components/visitor-view';
 import { AdminView } from '@/components/admin-view';
 import { LoginDialog } from '@/components/login-dialog';
+import { DownloadPanel } from '@/components/download-panel';
+import { useDownloadQueue } from '@/lib/download-queue';
 import { Shield, User, Github, ExternalLink } from 'lucide-react';
 
 export default function Home() {
@@ -127,6 +130,44 @@ export default function Home() {
           onCancel={() => setShowLogin(false)}
         />
       )}
+
+      {/* 下载队列面板 */}
+      <DownloadPanelContainer />
     </div>
   );
+}
+
+// 下载面板容器组件
+function DownloadPanelContainer() {
+  const { isPanelOpen, setPanelOpen, tasks, pendingTasks, completedTasks, failedTasks } = useDownloadQueue();
+  
+  // 如果面板关闭但有任务，显示迷你指示器
+  if (!isPanelOpen && tasks.length > 0) {
+    return (
+      <button
+        onClick={() => setPanelOpen(true)}
+        className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-full shadow-lg hover:border-[#00d17a]/50 transition-all"
+      >
+        <div className="relative">
+          <Download className="w-5 h-5 text-[#00d17a]" />
+          {pendingTasks > 0 && (
+            <Loader2 className="w-5 h-5 text-[#00d17a] animate-spin absolute inset-0" />
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {pendingTasks > 0 && (
+            <span className="text-sm text-[#00d17a]">{pendingTasks} 进行中</span>
+          )}
+          {completedTasks > 0 && !pendingTasks && (
+            <span className="text-sm text-[#00d17a]">{completedTasks} 已完成</span>
+          )}
+          {failedTasks > 0 && !pendingTasks && (
+            <span className="text-sm text-[#e74c3c]">{failedTasks} 失败</span>
+          )}
+        </div>
+      </button>
+    );
+  }
+  
+  return <DownloadPanel />;
 }

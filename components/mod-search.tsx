@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Download, Package, Check, Loader2, ExternalLink, Plus } from 'lucide-react';
+import { Search, Download, Package, Check, Loader2, ExternalLink, Plus, ListPlus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useDownloadQueue } from '@/lib/download-queue';
 
 interface SearchResult {
   project_id: string;
@@ -39,9 +40,9 @@ export function ModSearch() {
   const [selectedMod, setSelectedMod] = useState<SearchResult | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
-  const [installing, setInstalling] = useState<string | null>(null);
-  const [installed, setInstalled] = useState<string | null>(null);
+  const [addedToQueue, setAddedToQueue] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const { addTask, tasks } = useDownloadQueue();
 
   const searchMods = async () => {
     if (!query.trim()) return;
@@ -67,7 +68,7 @@ export function ModSearch() {
     setSelectedMod(mod);
     setLoadingVersions(true);
     setVersions([]);
-    setInstalled(null);
+    setAddedToQueue(null);
     
     try {
       const res = await fetch('/api/search', {
@@ -87,37 +88,34 @@ export function ModSearch() {
     }
   };
 
-  const installMod = async (versionId: string) => {
+  const addToDownloadQueue = (version: Version) => {
     if (!selectedMod) return;
 
-    setInstalling(versionId);
-    setError('');
-    
-    try {
-      const res = await fetch('/api/mods', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: selectedMod.project_id,
-          versionId: versionId,
-        }),
-      });
-
-      if (res.ok) {
-        setInstalled(versionId);
-        setTimeout(() => {
-          setSelectedMod(null);
-          setInstalled(null);
-        }, 1500);
-      } else {
-        const data = await res.json();
-        setError(data.error || '安装失败');
-      }
-    } catch (error) {
-      setError('安装出错');
-    } finally {
-      setInstalling(null);
+    // 检查是否已在队列中
+    const existingTask = tasks.find(
+      (t) => t.modId === selectedMod.project_id && t.versionId === version.id
+    );
+    if (existingTask) {
+      setError('该版本已在下载队列中');
+      return;
     }
+
+    const primaryFile = version.files.find((f) => f.primary) || version.files[0];
+    
+    addTask({
+      modId: selectedMod.project_id,
+      modName: selectedMod.title,
+      versionId: version.id,
+      versionNumber: version.version_number,
+      filename: primaryFile?.filename || `${selectedMod.slug}-${version.version_number}.jar`,
+      iconUrl: selectedMod.icon_url,
+    });
+
+    setAddedToQueue(version.id);
+    setTimeout(() => {
+      setSelectedMod(null);
+      setAddedToQueue(null);
+    }, 1000);
   };
 
   const getEnvironmentBadge = (client: string, server: string) => {
@@ -316,26 +314,24 @@ export function ModSearch() {
                     </div>
                     <Button
                       size="sm"
-                      onClick={() => installMod(version.id)}
-                      disabled={installing === version.id || installed === version.id}
+                      onClick={() => addToDownloadQueue(version)}
+                      disabled={addedToQueue === version.id}
                       className={`
-                        ${installed === version.id 
+                        ${addedToQueue === version.id 
                           ? 'bg-[#00d17a] text-black' 
                           : 'bg-[#00d17a] hover:bg-[#00b86b] text-black'
                         }
                       `}
                     >
-                      {installing === version.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : installed === version.id ? (
+                      {addedToQueue === version.id ? (
                         <>
                           <Check className="w-4 h-4 mr-1" />
-                          已安装
+                          已添加
                         </>
                       ) : (
                         <>
-                          <Download className="w-4 h-4 mr-1" />
-                          安装
+                          <ListPlus className="w-4 h-4 mr-1" />
+                          添加到队列
                         </>
                       )}
                     </Button>

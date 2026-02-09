@@ -3,5 +3,6 @@
   "minecraftVersion": "1.21.1",
   "loader": "neoforge",
   "loaderVersion": "",
-  "showServerOnlyMods": false
+  "showServerOnlyMods": false,
+  "modManagementMode": "classic"
 }

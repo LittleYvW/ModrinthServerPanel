@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { FolderOpen, Save, Check, AlertCircle, Server, Eye } from 'lucide-react';
+import { FolderOpen, Save, Check, AlertCircle, Server, Eye, LayoutGrid, Sparkles } from 'lucide-react';
 
 type Loader = 'fabric' | 'forge' | 'quilt' | 'neoforge';
+type ModManagementMode = 'classic' | 'immersive';
 
 interface Config {
   path: string;
@@ -17,6 +18,7 @@ interface Config {
   loader: Loader;
   loaderVersion: string;
   showServerOnlyMods: boolean;
+  modManagementMode: ModManagementMode;
 }
 
 const loaders: { value: Loader; label: string; color: string }[] = [
@@ -26,6 +28,11 @@ const loaders: { value: Loader; label: string; color: string }[] = [
   { value: 'neoforge', label: 'NeoForge', color: '#e67e22' },
 ];
 
+const managementModes: { value: ModManagementMode; label: string; description: string }[] = [
+  { value: 'classic', label: '经典', description: '传统的三列网格布局，适合高效管理' },
+  { value: 'immersive', label: '沉浸式', description: '视觉化的模组展示，更具沉浸感（开发中）' },
+];
+
 export function ServerConfigPanel() {
   const [config, setConfig] = useState<Config>({
     path: '',
@@ -33,6 +40,7 @@ export function ServerConfigPanel() {
     loader: 'fabric',
     loaderVersion: '',
     showServerOnlyMods: true,
+    modManagementMode: 'classic',
   });
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -213,6 +221,65 @@ export function ServerConfigPanel() {
           </div>
           <p className="text-xs text-[#707070]">
             控制访客在首页是否能看到纯服务端模组的列表
+          </p>
+        </div>
+
+        {/* 模组管理模式 */}
+        <div className="space-y-3 pt-2 border-t border-[#2a2a2a]">
+          <Label className="flex items-center gap-2 text-white">
+            <LayoutGrid className="w-4 h-4 text-[#00d17a]" />
+            模组管理方式
+          </Label>
+          <div className="grid grid-cols-2 gap-3">
+            {managementModes.map((mode) => (
+              <button
+                key={mode.value}
+                type="button"
+                onClick={() => setConfig({ ...config, modManagementMode: mode.value })}
+                className={`
+                  relative p-4 rounded-lg border-2 text-left transition-all duration-200
+                  ${config.modManagementMode === mode.value
+                    ? 'border-[#00d17a] bg-[#00d17a]/10'
+                    : 'border-[#2a2a2a] bg-[#1a1a1a] hover:border-[#3a3a3a]'
+                  }
+                `}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`
+                    p-2 rounded-lg
+                    ${config.modManagementMode === mode.value
+                      ? 'bg-[#00d17a]/20 text-[#00d17a]'
+                      : 'bg-[#2a2a2a] text-[#707070]'
+                    }
+                  `}>
+                    {mode.value === 'classic' ? (
+                      <LayoutGrid className="w-5 h-5" />
+                    ) : (
+                      <Sparkles className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className={`
+                      font-medium mb-1
+                      ${config.modManagementMode === mode.value ? 'text-white' : 'text-[#a0a0a0]'}
+                    `}>
+                      {mode.label}
+                    </div>
+                    <div className="text-xs text-[#707070]">
+                      {mode.description}
+                    </div>
+                  </div>
+                </div>
+                {config.modManagementMode === mode.value && (
+                  <div className="absolute top-2 right-2">
+                    <div className="w-2 h-2 rounded-full bg-[#00d17a]" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-[#707070]">
+            切换已安装模组的管理界面展示方式
           </p>
         </div>
 

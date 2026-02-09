@@ -214,7 +214,7 @@ export function ModManager() {
   };
 
   const ModList = ({ mods, category }: { mods: Mod[]; category: string }) => (
-    <Card className="border-[#2a2a2a] bg-[#151515] animate-fade-in-up">
+    <Card className="border-[#2a2a2a] bg-[#151515]">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base text-white">
           {getCategoryIcon(category)}

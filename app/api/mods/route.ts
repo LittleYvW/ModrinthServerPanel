@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // 分析环境
-    const env = analyzeEnvironment(version);
+    // 分析环境 - 使用 project 对象的环境信息（version 对象不包含 client_support/server_support）
+    const env = analyzeEnvironment(project);
     
     // 获取主文件
     const primaryFile = version.files.find((f: any) => f.primary) || version.files[0];
@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
       versionId: versionId,
       filename: primaryFile.filename,
       environment: {
-        client: version.client_support || project.client_side || 'required',
-        server: version.server_support || project.server_side || 'required',
+        client: project.client_side || 'required',
+        server: project.server_side || 'required',
       },
       category: env.category,
       installedAt: new Date().toISOString(),

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { FolderOpen, Save, Check, AlertCircle, Server, Eye, LayoutGrid, Sparkles } from 'lucide-react';
+import { FolderOpen, Save, Check, AlertCircle, Server, Eye, LayoutGrid, Sparkles, Lock } from 'lucide-react';
 
 type Loader = 'fabric' | 'forge' | 'quilt' | 'neoforge';
 type ModManagementMode = 'classic' | 'immersive';
@@ -28,9 +28,9 @@ const loaders: { value: Loader; label: string; color: string }[] = [
   { value: 'neoforge', label: 'NeoForge', color: '#e67e22' },
 ];
 
-const managementModes: { value: ModManagementMode; label: string; description: string }[] = [
+const managementModes: { value: ModManagementMode; label: string; description: string; disabled?: boolean }[] = [
   { value: 'classic', label: '经典', description: '传统的三列网格布局，适合高效管理' },
-  { value: 'immersive', label: '沉浸式', description: '视觉化的模组展示，更具沉浸感（开发中）' },
+  { value: 'immersive', label: '沉浸式', description: '视觉化的模组展示，更具沉浸感（即将推出）', disabled: true },
 ];
 
 export function ServerConfigPanel() {
@@ -235,21 +235,26 @@ export function ServerConfigPanel() {
               <button
                 key={mode.value}
                 type="button"
-                onClick={() => setConfig({ ...config, modManagementMode: mode.value })}
+                disabled={mode.disabled}
+                onClick={() => !mode.disabled && setConfig({ ...config, modManagementMode: mode.value })}
                 className={`
                   relative p-4 rounded-lg border-2 text-left transition-all duration-200
-                  ${config.modManagementMode === mode.value
-                    ? 'border-[#00d17a] bg-[#00d17a]/10'
-                    : 'border-[#2a2a2a] bg-[#1a1a1a] hover:border-[#3a3a3a]'
+                  ${mode.disabled
+                    ? 'border-[#2a2a2a] bg-[#1a1a1a]/50 cursor-not-allowed opacity-60'
+                    : config.modManagementMode === mode.value
+                      ? 'border-[#00d17a] bg-[#00d17a]/10'
+                      : 'border-[#2a2a2a] bg-[#1a1a1a] hover:border-[#3a3a3a]'
                   }
                 `}
               >
                 <div className="flex items-start gap-3">
                   <div className={`
                     p-2 rounded-lg
-                    ${config.modManagementMode === mode.value
-                      ? 'bg-[#00d17a]/20 text-[#00d17a]'
-                      : 'bg-[#2a2a2a] text-[#707070]'
+                    ${mode.disabled
+                      ? 'bg-[#2a2a2a]/50 text-[#505050]'
+                      : config.modManagementMode === mode.value
+                        ? 'bg-[#00d17a]/20 text-[#00d17a]'
+                        : 'bg-[#2a2a2a] text-[#707070]'
                     }
                   `}>
                     {mode.value === 'classic' ? (
@@ -260,19 +265,30 @@ export function ServerConfigPanel() {
                   </div>
                   <div className="flex-1">
                     <div className={`
-                      font-medium mb-1
-                      ${config.modManagementMode === mode.value ? 'text-white' : 'text-[#a0a0a0]'}
+                      font-medium mb-1 flex items-center gap-2
+                      ${mode.disabled
+                        ? 'text-[#505050]'
+                        : config.modManagementMode === mode.value
+                          ? 'text-white'
+                          : 'text-[#a0a0a0]'
+                      }
                     `}>
                       {mode.label}
+                      {mode.disabled && <Lock className="w-3 h-3" />}
                     </div>
                     <div className="text-xs text-[#707070]">
                       {mode.description}
                     </div>
                   </div>
                 </div>
-                {config.modManagementMode === mode.value && (
+                {!mode.disabled && config.modManagementMode === mode.value && (
                   <div className="absolute top-2 right-2">
                     <div className="w-2 h-2 rounded-full bg-[#00d17a]" />
+                  </div>
+                )}
+                {mode.disabled && (
+                  <div className="absolute top-2 right-2">
+                    <Lock className="w-3 h-3 text-[#505050]" />
                   </div>
                 )}
               </button>

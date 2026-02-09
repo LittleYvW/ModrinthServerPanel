@@ -31,6 +31,13 @@ interface Version {
   files: { filename: string; primary: boolean }[];
   loaders: string[];
   game_versions: string[];
+  date_published?: string;
+  changelog?: string;
+}
+
+interface ServerConfig {
+  minecraftVersion: string;
+  loader: string;
 }
 
 export function ModSearch() {
@@ -42,6 +49,7 @@ export function ModSearch() {
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [addedToQueue, setAddedToQueue] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
   const { addTask, tasks } = useDownloadQueue();
 
   const searchMods = async () => {
@@ -71,7 +79,7 @@ export function ModSearch() {
     projectId: string, 
     abortController: AbortController,
     maxRetries = 3
-  ): Promise<{ success: boolean; versions?: Version[]; error?: string }> => {
+  ): Promise<{ success: boolean; versions?: Version[]; serverConfig?: ServerConfig; error?: string }> => {
     let lastError = '';
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -95,7 +103,11 @@ export function ModSearch() {
         
         if (res.ok) {
           console.log(`[Frontend] Successfully fetched ${data.versions?.length || 0} versions`);
-          return { success: true, versions: data.versions || [] };
+          return { 
+            success: true, 
+            versions: data.versions || [],
+            serverConfig: data.serverConfig
+          };
         }
         
         // 记录错误信息
@@ -156,6 +168,7 @@ export function ModSearch() {
     if (abortControllerRef.current === abortController) {
       if (result.success && result.versions) {
         setVersions(result.versions);
+        setServerConfig(result.serverConfig || null);
       } else if (result.error) {
         setError(result.error);
       }
@@ -203,6 +216,26 @@ export function ModSearch() {
       return <Badge className="bg-[#9b59b6]/20 text-[#9b59b6] border-0">客户端</Badge>;
     }
     return <Badge variant="outline" className="border-[#2a2a2a] text-[#707070]">可选</Badge>;
+  };
+
+  // 检查版本是否与服务器配置兼容
+  const checkVersionCompatibility = (version: Version): {
+    isCompatible: boolean;
+    gameVersionMatch: boolean;
+    loaderMatch: boolean;
+  } => {
+    if (!serverConfig) {
+      return { isCompatible: false, gameVersionMatch: false, loaderMatch: false };
+    }
+
+    const gameVersionMatch = version.game_versions?.includes(serverConfig.minecraftVersion) ?? false;
+    const loaderMatch = version.loaders?.includes(serverConfig.loader) ?? false;
+    
+    return {
+      isCompatible: gameVersionMatch && loaderMatch,
+      gameVersionMatch,
+      loaderMatch
+    };
   };
 
   return (
@@ -344,76 +377,143 @@ export function ModSearch() {
           ) : (
             <ScrollArea className="max-h-[400px]">
               <div className="space-y-2">
-                {versions.map((version) => (
-                  <div
-                    key={version.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-[#151515] border border-[#2a2a2a]"
-                  >
-                    <div className="flex-1 min-w-0 mr-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-white">
-                          {version.version_number}
-                        </span>
-                        {getEnvironmentBadge(version.client_support, version.server_support)}
-                      </div>
-                      <p className="text-xs text-[#707070] mt-1 truncate">
-                        {version.files.find(f => f.primary)?.filename || version.files[0]?.filename}
-                      </p>
-                      {/* 加载器和游戏版本元数据 */}
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        {version.loaders?.map((loader) => (
-                          <Badge
-                            key={loader}
-                            variant="outline"
-                            className="text-[10px] h-5 px-1.5 border-[#00d17a]/30 text-[#00d17a] bg-[#00d17a]/5"
-                          >
-                            {loader}
-                          </Badge>
-                        ))}
-                        {version.game_versions?.slice(0, 3).map((ver) => (
-                          <Badge
-                            key={ver}
-                            variant="outline"
-                            className="text-[10px] h-5 px-1.5 border-[#2a2a2a] text-[#707070]"
-                          >
-                            {ver}
-                          </Badge>
-                        ))}
-                        {version.game_versions?.length > 3 && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] h-5 px-1.5 border-[#2a2a2a] text-[#505050]"
-                          >
-                            +{version.game_versions.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => addToDownloadQueue(version)}
-                      disabled={addedToQueue === version.id}
+                {/* 服务端配置提示 */}
+                {serverConfig && (
+                  <div className="mb-3 p-2 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a]">
+                    <p className="text-xs text-[#707070]">
+                      服务端配置: 
+                      <span className="text-[#00d17a] ml-1">{serverConfig.minecraftVersion}</span>
+                      <span className="text-[#707070] mx-1">+</span>
+                      <span className="text-[#00d17a]">{serverConfig.loader}</span>
+                      <span className="text-[#505050] ml-2">（绿色高亮为兼容版本）</span>
+                    </p>
+                  </div>
+                )}
+                {versions.map((version) => {
+                  const compatibility = checkVersionCompatibility(version);
+                  return (
+                    <div
+                      key={version.id}
                       className={`
-                        ${addedToQueue === version.id 
-                          ? 'bg-[#00d17a] text-black' 
-                          : 'bg-[#00d17a] hover:bg-[#00b86b] text-black'
+                        flex items-center justify-between p-3 rounded-lg border transition-all
+                        ${compatibility.isCompatible 
+                          ? 'bg-[#00d17a]/10 border-[#00d17a]/50 shadow-[0_0_10px_rgba(0,209,122,0.1)]' 
+                          : 'bg-[#151515] border-[#2a2a2a]'
                         }
                       `}
                     >
-                      {addedToQueue === version.id ? (
-                        <>
-                          <Check className="w-4 h-4 mr-1" />
-                          已添加
-                        </>
-                      ) : (
-                        <>
-                          <ListPlus className="w-4 h-4 mr-1" />
-                          添加到队列
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex-1 min-w-0 mr-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`
+                            font-medium
+                            ${compatibility.isCompatible ? 'text-[#00d17a]' : 'text-white'}
+                          `}>
+                            {version.version_number}
+                          </span>
+                          {getEnvironmentBadge(version.client_support, version.server_support)}
+                          {compatibility.isCompatible && (
+                            <Badge className="bg-[#00d17a] text-black border-0 text-[10px] h-5 px-1.5">
+                              <Check className="w-3 h-3 mr-0.5" />
+                              推荐
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-[#707070] mt-1 truncate">
+                          {version.files.find(f => f.primary)?.filename || version.files[0]?.filename}
+                        </p>
+                        {/* 加载器和游戏版本元数据 - 带兼容性高亮 */}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {version.loaders?.map((loader) => {
+                            const isMatchedLoader = serverConfig?.loader === loader;
+                            return (
+                              <Badge
+                                key={loader}
+                                variant="outline"
+                                className={`
+                                  text-[10px] h-5 px-1.5
+                                  ${isMatchedLoader 
+                                    ? 'border-[#00d17a] text-[#00d17a] bg-[#00d17a]/10' 
+                                    : 'border-[#3a3a3a] text-[#606060]'
+                                  }
+                                `}
+                              >
+                                {loader}
+                                {isMatchedLoader && <Check className="w-3 h-3 ml-0.5" />}
+                              </Badge>
+                            );
+                          })}
+                          {version.game_versions?.slice(0, 5).map((ver) => {
+                            const isMatchedVersion = serverConfig?.minecraftVersion === ver;
+                            return (
+                              <Badge
+                                key={ver}
+                                variant="outline"
+                                className={`
+                                  text-[10px] h-5 px-1.5
+                                  ${isMatchedVersion 
+                                    ? 'border-[#00d17a] text-[#00d17a] bg-[#00d17a]/10' 
+                                    : 'border-[#3a3a3a] text-[#606060]'
+                                  }
+                                `}
+                              >
+                                {ver}
+                                {isMatchedVersion && <Check className="w-3 h-3 ml-0.5" />}
+                              </Badge>
+                            );
+                          })}
+                          {version.game_versions?.length > 5 && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] h-5 px-1.5 border-[#2a2a2a] text-[#505050]"
+                            >
+                              +{version.game_versions.length - 5}
+                            </Badge>
+                          )}
+                        </div>
+                        {/* 兼容性说明 */}
+                        {!compatibility.isCompatible && serverConfig && (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            {!compatibility.gameVersionMatch && (
+                              <span className="text-[10px] text-[#e74c3c]">
+                                不支持 {serverConfig.minecraftVersion}
+                              </span>
+                            )}
+                            {!compatibility.loaderMatch && (
+                              <span className="text-[10px] text-[#e74c3c]">
+                                不支持 {serverConfig.loader}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => addToDownloadQueue(version)}
+                        disabled={addedToQueue === version.id}
+                        className={`
+                          ${addedToQueue === version.id 
+                            ? 'bg-[#00d17a] text-black' 
+                            : compatibility.isCompatible
+                              ? 'bg-[#00d17a] hover:bg-[#00c06e] text-black'
+                              : 'bg-[#2a2a2a] hover:bg-[#333] text-white border border-[#3a3a3a]'
+                          }
+                        `}
+                      >
+                        {addedToQueue === version.id ? (
+                          <>
+                            <Check className="w-4 h-4 mr-1" />
+                            已添加
+                          </>
+                        ) : (
+                          <>
+                            <ListPlus className="w-4 h-4 mr-1" />
+                            {compatibility.isCompatible ? '添加' : '仍添加'}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             </ScrollArea>
           )}

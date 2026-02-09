@@ -9,6 +9,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import {
   Download,
@@ -125,23 +131,37 @@ function TaskItem({ task, onRemove, onRetry }: {
 
           {/* 信息 */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-white text-sm truncate">
-                {task.modName}
-              </span>
+            <div className="flex items-center gap-2 min-w-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="font-medium text-white text-sm truncate block flex-1 min-w-0">
+                    {task.modName}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p>{task.modName}</p>
+                </TooltipContent>
+              </Tooltip>
               <Badge
                 variant="secondary"
-                className={cn('text-[10px] h-5 px-1.5 border-0', getStatusColor(task.status))}
+                className={cn('text-[10px] h-5 px-1.5 border-0 flex-shrink-0 whitespace-nowrap', getStatusColor(task.status))}
               >
                 {getStatusIcon(task.status)}
                 <span className="ml-1">{getStatusText(task.status)}</span>
               </Badge>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-[#707070] mt-1">
-              <span>{task.versionNumber}</span>
-              <span>•</span>
-              <span className="truncate">{task.filename}</span>
+            <div className="flex items-center gap-2 text-xs text-[#707070] mt-1 min-w-0">
+              <span className="flex-shrink-0">{task.versionNumber}</span>
+              <span className="flex-shrink-0">•</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="truncate block flex-1 min-w-0">{task.filename}</span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="break-all">{task.filename}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* 进度条 */}
@@ -175,7 +195,7 @@ function TaskItem({ task, onRemove, onRetry }: {
                 size="icon"
                 variant="ghost"
                 onClick={onRetry}
-                className="w-7 h-7 text-[#707070] hover:text-[#00d17a] hover:bg-[#00d17a]/10"
+                className="w-7 h-7 text-[#707070] hover:text-[#00d17a] hover:bg-[#00d17a]/10 flex-shrink-0"
               >
                 <RotateCcw className="w-4 h-4" />
               </Button>
@@ -184,7 +204,7 @@ function TaskItem({ task, onRemove, onRetry }: {
               size="icon"
               variant="ghost"
               onClick={onRemove}
-              className="w-7 h-7 text-[#707070] hover:text-[#e74c3c] hover:bg-[#e74c3c]/10"
+              className="w-7 h-7 text-[#707070] hover:text-[#e74c3c] hover:bg-[#e74c3c]/10 flex-shrink-0"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -197,14 +217,14 @@ function TaskItem({ task, onRemove, onRetry }: {
         <>
           <Separator className="bg-[#2a2a2a]" />
           <div className="px-3 py-2 bg-[#1a1a1a]/50">
-            <div className="flex items-center justify-between text-xs text-[#707070]">
-              <div className="flex items-center gap-3">
-                <span>开始: {formatTime(task.addedAt)}</span>
+            <div className="flex items-center justify-between text-xs text-[#707070] gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="flex-shrink-0">开始: {formatTime(task.addedAt)}</span>
                 {task.completedAt && (
-                  <span>完成: {formatTime(task.completedAt)}</span>
+                  <span className="flex-shrink-0">完成: {formatTime(task.completedAt)}</span>
                 )}
               </div>
-              <span>
+              <span className="flex-shrink-0">
                 耗时: {formatDuration(task.addedAt, task.completedAt)}
               </span>
             </div>
@@ -216,6 +236,14 @@ function TaskItem({ task, onRemove, onRetry }: {
 }
 
 export function DownloadPanel() {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <DownloadPanelContent />
+    </TooltipProvider>
+  );
+}
+
+function DownloadPanelContent() {
   const {
     tasks,
     isPanelOpen,
@@ -237,7 +265,7 @@ export function DownloadPanel() {
     <div
       className={cn(
         'fixed bottom-4 right-4 z-50 flex flex-col transition-all duration-300',
-        minimized ? 'w-72' : 'w-96'
+        minimized ? 'w-72' : 'w-[440px]'
       )}
     >
       {/* 头部 */}
@@ -295,10 +323,10 @@ export function DownloadPanel() {
 
       {/* 内容区 */}
       {!minimized && (
-        <>
+        <div className="bg-[#0d0d0d] border-x border-b border-[#2a2a2a] rounded-b-lg overflow-hidden flex flex-col max-h-[calc(100vh-120px)]">
           {/* 统计栏 */}
           {tasks.length > 0 && (
-            <div className="flex items-center gap-1 px-3 py-2 bg-[#151515] border-x border-[#2a2a2a]">
+            <div className="flex items-center gap-1 px-3 py-2 bg-[#151515] border-b border-[#2a2a2a] flex-shrink-0">
               {pendingTasks > 0 && (
                 <Badge
                   variant="secondary"
@@ -339,8 +367,8 @@ export function DownloadPanel() {
           )}
 
           {/* 任务列表 */}
-          <ScrollArea className="max-h-80 bg-[#0d0d0d] border-x border-b border-[#2a2a2a] rounded-b-lg">
-            <div className="p-3 space-y-2">
+          <ScrollArea className="flex-1 w-full" type="auto">
+            <div className="p-3 space-y-2" style={{ width: 'calc(100% - 4px)' }}>
               {tasks.length === 0 ? (
                 <div className="text-center py-8 text-[#707070]">
                   <Download className="w-10 h-10 mx-auto mb-2 opacity-50" />
@@ -358,7 +386,7 @@ export function DownloadPanel() {
               )}
             </div>
           </ScrollArea>
-        </>
+        </div>
       )}
 
       {/* 最小化时的底部圆角 */}

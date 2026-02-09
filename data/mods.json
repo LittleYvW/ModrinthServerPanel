@@ -1,22 +1,5 @@
 [
   {
-    "id": "23MovWyi",
-    "slug": "improved-mobs",
-    "name": "Improved Mobs",
-    "versionId": "YxjEeT9H",
-    "filename": "improvedmobs-1.21.1-1.15.2-fabric.jar",
-    "environment": {
-      "client": "optional",
-      "server": "required"
-    },
-    "category": "server-only",
-    "installedAt": "2026-02-08T14:38:03.588Z",
-    "iconUrl": "https://cdn.modrinth.com/data/23MovWyi/2633906867d1bc82ea96c421a6de165e3bf8ae01_96.webp",
-    "description": "Harder mobs for increased difficulty",
-    "versionNumber": "1.21.1-1.15.2-fabric",
-    "enabled": true
-  },
-  {
     "id": "LNytGWDc",
     "slug": "create",
     "name": "Create",
@@ -32,5 +15,22 @@
     "description": "Aesthetic Technology that empowers the Player",
     "versionNumber": "mc1.21.1-6.0.9",
     "enabled": true
+  },
+  {
+    "id": "23MovWyi",
+    "slug": "improved-mobs",
+    "name": "Improved Mobs",
+    "versionId": "diNLFI6L",
+    "filename": "improvedmobs-1.21.1-1.15.2-neoforge.jar",
+    "environment": {
+      "client": "optional",
+      "server": "required"
+    },
+    "category": "server-only",
+    "installedAt": "2026-02-09T07:33:24.909Z",
+    "iconUrl": "https://cdn.modrinth.com/data/23MovWyi/2633906867d1bc82ea96c421a6de165e3bf8ae01_96.webp",
+    "description": "Harder mobs for increased difficulty",
+    "versionNumber": "1.21.1-1.15.2-neoforge",
+    "enabled": false
   }
 ]

@@ -53,19 +53,34 @@ export async function getProjectVersions(
     game_versions?: string[];
   } = {}
 ) {
-  const params = new URLSearchParams();
+  // 使用 axios 的 params 选项，它会自动处理数组参数
+  const params: Record<string, string[]> = {};
   
-  if (filters.loaders) {
-    filters.loaders.forEach(loader => params.append('loaders[]', loader));
+  if (filters.loaders && filters.loaders.length > 0) {
+    params.loaders = filters.loaders;
   }
-  if (filters.game_versions) {
-    filters.game_versions.forEach(v => params.append('game_versions[]', v));
+  if (filters.game_versions && filters.game_versions.length > 0) {
+    params.game_versions = filters.game_versions;
   }
   
-  const response = await api.get(
-    `/project/${projectId}/version?${params.toString()}`
-  );
-  return response.data;
+  console.log('[Modrinth] Fetching versions for project:', projectId, 'with params:', params);
+  
+  try {
+    const response = await api.get(`/project/${projectId}/version`, { params });
+    console.log('[Modrinth] API response status:', response.status);
+    return response.data;
+  } catch (error: any) {
+    console.error('[Modrinth] API error:', {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url,
+      params: error.config?.params
+    });
+    throw error;
+  }
 }
 
 // 获取版本详情

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,26 +64,101 @@ export function ModSearch() {
     }
   };
 
+  // 使用 ref 来跟踪最新的请求，避免竞争条件
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
+  const fetchVersionsWithRetry = async (
+    projectId: string, 
+    abortController: AbortController,
+    maxRetries = 3
+  ): Promise<{ success: boolean; versions?: Version[]; error?: string }> => {
+    let lastError = '';
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        console.log(`[Frontend] Fetching versions for ${projectId}, attempt ${attempt + 1}/${maxRetries}`);
+        
+        const res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId }),
+          signal: abortController.signal,
+        });
+        
+        // 如果请求被中止，立即返回
+        if (abortController.signal.aborted) {
+          console.log('[Frontend] Request aborted');
+          return { success: false };
+        }
+        
+        const data = await res.json().catch(() => ({}));
+        
+        if (res.ok) {
+          console.log(`[Frontend] Successfully fetched ${data.versions?.length || 0} versions`);
+          return { success: true, versions: data.versions || [] };
+        }
+        
+        // 记录错误信息
+        lastError = data.error || `HTTP ${res.status}`;
+        console.error(`[Frontend] Attempt ${attempt + 1} failed:`, res.status, data);
+        
+        // 如果是可重试的错误且不是最后一次尝试，则等待后重试
+        if ((res.status === 502 || res.status === 429 || data.retryable) && attempt < maxRetries - 1) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 3000); // 指数退避，最多3秒
+          console.log(`[Frontend] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        // 不可重试的错误，直接返回
+        return { success: false, error: lastError };
+        
+      } catch (error) {
+        // 忽略中止错误
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return { success: false };
+        }
+        
+        lastError = error instanceof Error ? error.message : '网络错误';
+        console.error(`[Frontend] Attempt ${attempt + 1} error:`, error);
+        
+        // 网络错误也重试
+        if (attempt < maxRetries - 1) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 3000);
+          console.log(`[Frontend] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    return { success: false, error: lastError || '获取版本列表失败，请重试' };
+  };
+
   const showVersions = async (mod: SearchResult) => {
+    // 取消之前的请求
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // 创建新的 AbortController
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
     setSelectedMod(mod);
     setLoadingVersions(true);
     setVersions([]);
     setAddedToQueue(null);
+    setError('');
     
-    try {
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: mod.project_id }),
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setVersions(data.versions || []);
+    const result = await fetchVersionsWithRetry(mod.project_id, abortController, 3);
+    
+    // 只有最新的请求才更新状态
+    if (abortControllerRef.current === abortController) {
+      if (result.success && result.versions) {
+        setVersions(result.versions);
+      } else if (result.error) {
+        setError(result.error);
       }
-    } catch (error) {
-      console.error('Failed to fetch versions:', error);
-    } finally {
       setLoadingVersions(false);
     }
   };

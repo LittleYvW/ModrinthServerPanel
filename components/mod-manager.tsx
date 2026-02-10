@@ -589,10 +589,11 @@ export function ModManager() {
             className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
           >
             <motion.div
+              className="mr-2"
               animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
               transition={{ duration: 2, ease: 'linear', repeat: refreshing ? Infinity : 0 }}
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw className="w-4 h-4" />
             </motion.div>
             刷新
           </Button>

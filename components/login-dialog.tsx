@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock, Loader2, Shield } from 'lucide-react';
-import { dialogOverlay, dialogContent, alert } from '@/lib/animations';
+import { dialogOverlay, dialogContent, alertAnimation } from '@/lib/animations';
 
 interface LoginDialogProps {
   onLogin: () => void;
@@ -93,7 +93,7 @@ export function LoginDialog({ onLogin, onCancel }: LoginDialogProps) {
           {error && (
             <motion.div
               className="mb-4"
-              variants={alert}
+              variants={alertAnimation}
               initial="hidden"
               animate="visible"
               exit="exit"

@@ -21,7 +21,6 @@ import {
   listItem, 
   springScale,
   cardHover,
-  alert,
   dropdownMenu 
 } from '@/lib/animations';
 

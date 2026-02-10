@@ -260,7 +260,7 @@ export const panelExpand: Variants = {
 };
 
 // ===== 通知/警告动画 =====
-export const alert: Variants = {
+export const alertAnimation: Variants = {
   hidden: { opacity: 0, y: -8, scale: 0.98 },
   visible: {
     opacity: 1,

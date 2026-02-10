@@ -313,7 +313,7 @@ export function VisitorView() {
 
       {/* 服务端模组信息 */}
       {config.showServerOnlyMods && mods.serverOnly.length > 0 && (
-        <Card className="border-[#2a2a2a] bg-[#151515]/50 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+        <Card className="border-[#2a2a2a] bg-[#151515]/50 animate-fade-in-up opacity-0" style={{ animationDelay: '0.25s' }}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-[#a0a0a0]">
               <Server className="w-5 h-5" />

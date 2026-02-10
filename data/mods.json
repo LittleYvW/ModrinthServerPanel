@@ -14,7 +14,8 @@
     "iconUrl": "https://cdn.modrinth.com/data/LNytGWDc/61d716699bcf1ec42ed4926a9e1c7311be6087e2_96.webp",
     "description": "Aesthetic Technology that empowers the Player",
     "versionNumber": "mc1.21.1-6.0.9",
-    "enabled": true
+    "enabled": true,
+    "recommended": true
   },
   {
     "id": "23MovWyi",
@@ -26,12 +27,12 @@
       "client": "optional",
       "server": "required"
     },
-    "category": "client-only",
+    "category": "server-only",
     "installedAt": "2026-02-09T07:33:24.909Z",
     "iconUrl": "https://cdn.modrinth.com/data/23MovWyi/2633906867d1bc82ea96c421a6de165e3bf8ae01_96.webp",
     "description": "Harder mobs for increased difficulty",
     "versionNumber": "1.21.1-1.15.2-neoforge",
     "enabled": true,
-    "recommended": true
+    "recommended": false
   }
 ]

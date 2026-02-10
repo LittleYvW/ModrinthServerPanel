@@ -11,6 +11,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Modrinth Server Panel",
   description: "Minecraft 服务器模组管理面板",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

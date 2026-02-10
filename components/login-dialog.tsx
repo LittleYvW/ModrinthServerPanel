@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,26 @@ export function LoginDialog({ onLogin, onCancel }: LoginDialogProps) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isDefaultPassword, setIsDefaultPassword] = useState(true);
+  const [checking, setChecking] = useState(true);
+
+  // 获取密码状态
+  useEffect(() => {
+    const checkPasswordStatus = async () => {
+      try {
+        const res = await fetch('/api/auth');
+        if (res.ok) {
+          const data = await res.json();
+          setIsDefaultPassword(data.isDefaultPassword);
+        }
+      } catch (error) {
+        console.error('Failed to check password status:', error);
+      } finally {
+        setChecking(false);
+      }
+    };
+    checkPasswordStatus();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,14 +98,19 @@ export function LoginDialog({ onLogin, onCancel }: LoginDialogProps) {
           >
             管理员登录
           </motion.h2>
-          <motion.p 
-            className="text-sm text-[#a0a0a0] mt-1"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            默认密码: admin
-          </motion.p>
+          <AnimatePresence mode="wait">
+            {!checking && isDefaultPassword && (
+              <motion.p 
+                className="text-sm text-[#a0a0a0] mt-1"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ delay: 0.2 }}
+              >
+                默认密码: admin
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* 错误提示 */}

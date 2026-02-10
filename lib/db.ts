@@ -171,3 +171,9 @@ export function verifyPassword(password: string): boolean {
   const auth = getAuth();
   return auth.password === password;
 }
+
+// 检查是否使用的是默认密码
+export function isDefaultPassword(): boolean {
+  const auth = getAuth();
+  return auth.password === defaultAuth.password;
+}

@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyPassword, saveAuth } from '@/lib/db';
+import { verifyPassword, saveAuth, isDefaultPassword } from '@/lib/db';
+
+// GET: 获取密码状态（是否使用默认密码）
+export async function GET() {
+  try {
+    const isDefault = isDefaultPassword();
+    return NextResponse.json({ isDefaultPassword: isDefault });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to get auth status' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

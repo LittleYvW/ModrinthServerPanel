@@ -208,7 +208,7 @@ export function VisitorView() {
 
       {/* 推荐客户端模组 */}
       {mods.clientOnly.length > 0 && (
-        <Card className="border-[#2a2a2a] bg-[#151515] animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+        <Card className="border-[#2a2a2a] bg-[#151515] animate-fade-in-up opacity-0" style={{ animationDelay: '0.15s' }}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Monitor className="w-5 h-5 text-[#f1c40f]" />

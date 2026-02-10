@@ -215,7 +215,7 @@ export function ModSearch() {
     } else if (client === 'required' && server !== 'required') {
       return <Badge className="bg-[#9b59b6]/20 text-[#9b59b6] border-0">客户端</Badge>;
     }
-    return <Badge variant="outline" className="border-[#2a2a2a] text-[#707070]">可选</Badge>;
+    return null;
   };
 
   // 检查版本是否与服务器配置兼容
@@ -377,18 +377,7 @@ export function ModSearch() {
           ) : (
             <ScrollArea className="max-h-[400px]">
               <div className="space-y-2">
-                {/* 服务端配置提示 */}
-                {serverConfig && (
-                  <div className="mb-3 p-2 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a]">
-                    <p className="text-xs text-[#707070]">
-                      服务端配置: 
-                      <span className="text-[#00d17a] ml-1">{serverConfig.minecraftVersion}</span>
-                      <span className="text-[#707070] mx-1">+</span>
-                      <span className="text-[#00d17a]">{serverConfig.loader}</span>
-                      <span className="text-[#505050] ml-2">（绿色高亮为兼容版本）</span>
-                    </p>
-                  </div>
-                )}
+
                 {versions.map((version) => {
                   const compatibility = checkVersionCompatibility(version);
                   return (
@@ -469,22 +458,23 @@ export function ModSearch() {
                               +{version.game_versions.length - 5}
                             </Badge>
                           )}
+                          {/* 不兼容提示标签 */}
+                          {!compatibility.isCompatible && serverConfig && (
+                            <>
+                              {!compatibility.gameVersionMatch && (
+                                <Badge className="text-[10px] h-5 px-1.5 bg-[#e74c3c]/20 text-[#e74c3c] border-0">
+                                  不支持 {serverConfig.minecraftVersion}
+                                </Badge>
+                              )}
+                              {!compatibility.loaderMatch && (
+                                <Badge className="text-[10px] h-5 px-1.5 bg-[#e74c3c]/20 text-[#e74c3c] border-0">
+                                  不支持 {serverConfig.loader}
+                                </Badge>
+                              )}
+                            </>
+                          )}
                         </div>
-                        {/* 兼容性说明 */}
-                        {!compatibility.isCompatible && serverConfig && (
-                          <div className="flex items-center gap-2 mt-1.5">
-                            {!compatibility.gameVersionMatch && (
-                              <span className="text-[10px] text-[#e74c3c]">
-                                不支持 {serverConfig.minecraftVersion}
-                              </span>
-                            )}
-                            {!compatibility.loaderMatch && (
-                              <span className="text-[10px] text-[#e74c3c]">
-                                不支持 {serverConfig.loader}
-                              </span>
-                            )}
-                          </div>
-                        )}
+
                       </div>
                       <Button
                         size="sm"

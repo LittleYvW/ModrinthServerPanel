@@ -32,6 +32,6 @@
     "description": "Harder mobs for increased difficulty",
     "versionNumber": "1.21.1-1.15.2-neoforge",
     "enabled": true,
-    "recommended": false
+    "recommended": true
   }
 ]

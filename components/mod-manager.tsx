@@ -265,17 +265,48 @@ export function ModManager() {
     );
   };
 
-  const ModList = ({ mods, category }: { mods: Mod[]; category: string }) => (
+  const ModList = ({ 
+    mods, 
+    category, 
+    showBatchDownload = false,
+    onBatchDownload,
+    batchDownloading = false
+  }: { 
+    mods: Mod[]; 
+    category: string;
+    showBatchDownload?: boolean;
+    onBatchDownload?: () => void;
+    batchDownloading?: boolean;
+  }) => (
     <Card className="border-[#2a2a2a] bg-[#151515]">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base text-white">
-          {getCategoryIcon(category)}
-          {category === 'both' && '双端模组'}
-          {category === 'server-only' && '纯服务端模组'}
-          {category === 'client-only' && '纯客户端模组'}
-          <Badge className={`${getCategoryColor(category)} border-0`}>
-            {mods.length}
-          </Badge>
+        <CardTitle className="flex items-center justify-between text-base text-white">
+          <div className="flex items-center gap-2">
+            {getCategoryIcon(category)}
+            {category === 'both' && '双端模组'}
+            {category === 'server-only' && '纯服务端模组'}
+            {category === 'client-only' && '纯客户端模组'}
+            <Badge className={`${getCategoryColor(category)} border-0`}>
+              {mods.length}
+            </Badge>
+          </div>
+          {/* 客户端模组批量下载按钮 */}
+          {showBatchDownload && onBatchDownload && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onBatchDownload}
+              disabled={batchDownloading}
+              className="border-[#9b59b6]/50 text-[#9b59b6] hover:text-[#9b59b6] hover:bg-[#9b59b6]/10 hover:border-[#9b59b6] text-xs h-7"
+            >
+              {batchDownloading ? (
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              ) : (
+                <Download className="w-3 h-3 mr-1" />
+              )}
+              下载全部
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -479,26 +510,13 @@ export function ModManager() {
       </div>
 
       {mods.clientOnly.length > 0 && (
-        <>
-          {/* 客户端模组批量下载按钮 */}
-          <div className="flex justify-end -mb-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={downloadAllClientMods}
-              disabled={batchDownloading}
-              className="border-[#9b59b6]/50 text-[#9b59b6] hover:text-[#9b59b6] hover:bg-[#9b59b6]/10 hover:border-[#9b59b6]"
-            >
-              {batchDownloading ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4 mr-2" />
-              )}
-              下载全部客户端模组 ({mods.clientOnly.length} 个)
-            </Button>
-          </div>
-          <ModList mods={mods.clientOnly} category="client-only" />
-        </>
+        <ModList 
+          mods={mods.clientOnly} 
+          category="client-only" 
+          showBatchDownload={true}
+          onBatchDownload={downloadAllClientMods}
+          batchDownloading={batchDownloading}
+        />
       )}
     </div>
   );

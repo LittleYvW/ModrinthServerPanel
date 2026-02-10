@@ -40,6 +40,7 @@ export function VisitorView() {
   const [config, setConfig] = useState<Config>({ showServerOnlyMods: true });
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [batchDownloadingClient, setBatchDownloadingClient] = useState(false);
 
   useEffect(() => {
     fetchMods();
@@ -90,9 +91,16 @@ export function VisitorView() {
   };
 
   const downloadAll = async () => {
-    // 下载所有双端模组和推荐的客户端模组
-    const allMods = [...mods.both, ...mods.clientOnly];
-    for (const mod of allMods) {
+    // 仅下载双端必需模组
+    for (const mod of mods.both) {
+      await downloadMod(mod.id, mod.filename);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  };
+
+  const downloadAllClientMods = async () => {
+    // 仅下载推荐客户端模组
+    for (const mod of mods.clientOnly) {
       await downloadMod(mod.id, mod.filename);
       await new Promise(resolve => setTimeout(resolve, 500));
     }
@@ -116,15 +124,15 @@ export function VisitorView() {
         </p>
       </div>
 
-      {/* 批量下载按钮 */}
-      {(mods.both.length > 0 || mods.clientOnly.length > 0) && (
+      {/* 批量下载按钮 - 仅双端必需模组 */}
+      {mods.both.length > 0 && (
         <div className="flex justify-center">
           <Button
             onClick={downloadAll}
             className="bg-[#00d17a] hover:bg-[#00b86b] text-black font-semibold px-6"
           >
             <Download className="w-4 h-4 mr-2" />
-            下载全部 ({mods.both.length + mods.clientOnly.length} 个)
+            下载全部 ({mods.both.length} 个)
           </Button>
         </div>
       )}
@@ -210,14 +218,35 @@ export function VisitorView() {
       {mods.clientOnly.length > 0 && (
         <Card className="border-[#2a2a2a] bg-[#151515] animate-fade-in-up opacity-0" style={{ animationDelay: '0.15s' }}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Monitor className="w-5 h-5 text-[#f1c40f]" />
-              推荐客户端模组
-              <Badge variant="secondary" className="bg-[#f1c40f]/20 text-[#f1c40f] border-0">
-                {mods.clientOnly.length}
-              </Badge>
-              <Star className="w-4 h-4 text-[#f1c40f] fill-[#f1c40f]" />
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-white">
+                <Monitor className="w-5 h-5 text-[#f1c40f]" />
+                推荐客户端模组
+                <Badge variant="secondary" className="bg-[#f1c40f]/20 text-[#f1c40f] border-0">
+                  {mods.clientOnly.length}
+                </Badge>
+                <Star className="w-4 h-4 text-[#f1c40f] fill-[#f1c40f]" />
+              </CardTitle>
+              {/* 批量下载推荐客户端模组 */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  setBatchDownloadingClient(true);
+                  await downloadAllClientMods();
+                  setBatchDownloadingClient(false);
+                }}
+                disabled={batchDownloadingClient}
+                className="border-[#f1c40f]/50 text-[#f1c40f] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10 hover:border-[#f1c40f] text-xs h-8"
+              >
+                {batchDownloadingClient ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <Download className="w-3 h-3 mr-1" />
+                )}
+                下载全部
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-[#707070] mb-4">

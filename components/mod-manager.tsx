@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check, Power, PowerOff } from 'lucide-react';
+import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check, Power, PowerOff, Star, StarOff, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Mod {
@@ -30,6 +30,7 @@ interface Mod {
   };
   installedAt: string;
   enabled?: boolean;
+  recommended?: boolean;
 }
 
 interface CategorizedMods {
@@ -45,6 +46,8 @@ export function ModManager() {
   const [refreshing, setRefreshing] = useState(false);
   const [updatingCategory, setUpdatingCategory] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [batchDownloading, setBatchDownloading] = useState(false);
 
   useEffect(() => {
     fetchMods();
@@ -115,6 +118,55 @@ export function ModManager() {
       console.error('Failed to toggle mod:', error);
     } finally {
       setToggling(null);
+    }
+  };
+
+  // 判断模组是否显示为禁用状态
+  const isModDisabled = (mod: Mod) => {
+    // 客户端模组始终视为启用（文件始终在 mods/ 目录）
+    if (mod.category === 'client-only') return false;
+    return mod.enabled === false;
+  };
+
+  // 下载模组
+  const downloadMod = async (mod: Mod) => {
+    setDownloading(mod.id);
+    try {
+      const res = await fetch(`/api/download?modId=${mod.id}`);
+      if (!res.ok) throw new Error('Download failed');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = mod.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('下载失败');
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  // 批量下载客户端模组
+  const downloadAllClientMods = async () => {
+    if (mods.clientOnly.length === 0) return;
+    
+    setBatchDownloading(true);
+    try {
+      for (const mod of mods.clientOnly) {
+        await downloadMod(mod);
+        // 添加延迟避免浏览器阻塞
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    } catch (error) {
+      console.error('Batch download error:', error);
+    } finally {
+      setBatchDownloading(false);
     }
   };
 
@@ -240,7 +292,7 @@ export function ModManager() {
                   key={mod.id}
                   className={cn(
                     'flex items-center gap-3 p-3 rounded-lg transition-all duration-250 ease-standard group',
-                    mod.enabled !== false
+                    !isModDisabled(mod)
                       ? 'bg-[#1a1a1a] hover:bg-[#1f1f1f] hover:translate-x-1'
                       : 'bg-[#1a1a1a]/50 opacity-60'
                   )}
@@ -286,28 +338,70 @@ export function ModManager() {
                     </div>
                   </div>
 
-                  {/* 开关按钮 */}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => toggleMod(mod.id)}
-                    disabled={toggling === mod.id}
-                    className={cn(
-                      'h-8 w-8 p-0 transition-all duration-200 ease-spring',
-                      mod.enabled !== false
-                        ? 'text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/10 hover:scale-110'
-                        : 'text-[#707070] hover:text-[#a0a0a0] hover:bg-[#2a2a2a] hover:scale-110'
-                    )}
-                    title={mod.enabled !== false ? '点击禁用' : '点击启用'}
-                  >
-                    {toggling === mod.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : mod.enabled !== false ? (
-                      <Power className="w-4 h-4" />
-                    ) : (
-                      <PowerOff className="w-4 h-4" />
-                    )}
-                  </Button>
+                  {/* 客户端模组：推荐按钮 + 下载按钮 */}
+                  {mod.category === 'client-only' ? (
+                    <>
+                      {/* 推荐按钮 */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toggleMod(mod.id)}
+                        disabled={toggling === mod.id}
+                        className={cn(
+                          'h-8 w-8 p-0 transition-all duration-200 ease-spring',
+                          mod.recommended
+                            ? 'text-[#f1c40f] hover:text-[#f39c12] hover:bg-[#f1c40f]/10 hover:scale-110'
+                            : 'text-[#707070] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10 hover:scale-110'
+                        )}
+                        title={mod.recommended ? '点击取消推荐' : '点击推荐此模组'}
+                      >
+                        {toggling === mod.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : mod.recommended ? (
+                          <Star className="w-4 h-4 fill-current" />
+                        ) : (
+                          <StarOff className="w-4 h-4" />
+                        )}
+                      </Button>
+                      {/* 下载按钮 */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => downloadMod(mod)}
+                        disabled={downloading === mod.id}
+                        className="h-8 w-8 p-0 text-[#707070] hover:text-[#00d17a] hover:bg-[#00d17a]/10 hover:scale-110 transition-all duration-200 ease-spring"
+                        title="下载此模组"
+                      >
+                        {downloading === mod.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleMod(mod.id)}
+                      disabled={toggling === mod.id}
+                      className={cn(
+                        'h-8 w-8 p-0 transition-all duration-200 ease-spring',
+                        mod.enabled !== false
+                          ? 'text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/10 hover:scale-110'
+                          : 'text-[#707070] hover:text-[#a0a0a0] hover:bg-[#2a2a2a] hover:scale-110'
+                      )}
+                      title={mod.enabled !== false ? '点击禁用' : '点击启用'}
+                    >
+                      {toggling === mod.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : mod.enabled !== false ? (
+                        <Power className="w-4 h-4" />
+                      ) : (
+                        <PowerOff className="w-4 h-4" />
+                      )}
+                    </Button>
+                  )}
 
                   {/* 删除按钮 */}
                   <AlertDialog>
@@ -385,7 +479,26 @@ export function ModManager() {
       </div>
 
       {mods.clientOnly.length > 0 && (
-        <ModList mods={mods.clientOnly} category="client-only" />
+        <>
+          {/* 客户端模组批量下载按钮 */}
+          <div className="flex justify-end -mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadAllClientMods}
+              disabled={batchDownloading}
+              className="border-[#9b59b6]/50 text-[#9b59b6] hover:text-[#9b59b6] hover:bg-[#9b59b6]/10 hover:border-[#9b59b6]"
+            >
+              {batchDownloading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              下载全部客户端模组 ({mods.clientOnly.length} 个)
+            </Button>
+          </div>
+          <ModList mods={mods.clientOnly} category="client-only" />
+        </>
       )}
     </div>
   );

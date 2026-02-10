@@ -26,11 +26,12 @@
       "client": "optional",
       "server": "required"
     },
-    "category": "server-only",
+    "category": "client-only",
     "installedAt": "2026-02-09T07:33:24.909Z",
     "iconUrl": "https://cdn.modrinth.com/data/23MovWyi/2633906867d1bc82ea96c421a6de165e3bf8ae01_96.webp",
     "description": "Harder mobs for increased difficulty",
     "versionNumber": "1.21.1-1.15.2-neoforge",
-    "enabled": true
+    "enabled": true,
+    "recommended": false
   }
 ]

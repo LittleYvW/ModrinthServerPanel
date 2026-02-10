@@ -81,6 +81,7 @@ export interface Mod {
   description?: string;
   versionNumber?: string;
   enabled?: boolean;    // 模组开关状态，默认为 true
+  recommended?: boolean; // 客户端模组是否推荐（用于访客模式显示）
 }
 
 export function getMods(): Mod[] {
@@ -139,6 +140,20 @@ export function toggleModEnabled(id: string): Mod | undefined {
   if (modIndex === -1) return undefined;
   
   mods[modIndex].enabled = !mods[modIndex].enabled;
+  saveMods(mods);
+  return mods[modIndex];
+}
+
+// 切换客户端模组推荐状态
+export function toggleClientModRecommended(id: string): Mod | undefined {
+  const mods = getMods();
+  const modIndex = mods.findIndex(m => m.id === id);
+  if (modIndex === -1) return undefined;
+  
+  // 只对客户端模组生效
+  if (mods[modIndex].category !== 'client-only') return undefined;
+  
+  mods[modIndex].recommended = !mods[modIndex].recommended;
   saveMods(mods);
   return mods[modIndex];
 }

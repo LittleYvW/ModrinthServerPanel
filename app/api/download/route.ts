@@ -27,14 +27,6 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // 检查模组是否启用
-    if (mod.enabled === false) {
-      return NextResponse.json(
-        { error: 'Mod is disabled' },
-        { status: 403 }
-      );
-    }
-    
     const config = getConfig();
     if (!config.path) {
       return NextResponse.json(
@@ -43,7 +35,21 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    const filePath = path.join(config.path, 'mods', mod.filename);
+    // 根据模组分类确定文件位置
+    let filePath: string;
+    if (mod.category === 'client-only') {
+      // 客户端模组在 .client/ 目录
+      filePath = path.join(config.path, 'mods', '.client', mod.filename);
+    } else {
+      // 检查模组是否启用
+      if (mod.enabled === false) {
+        return NextResponse.json(
+          { error: 'Mod is disabled' },
+          { status: 403 }
+        );
+      }
+      filePath = path.join(config.path, 'mods', mod.filename);
+    }
     
     if (!fs.existsSync(filePath)) {
       return NextResponse.json(
@@ -85,7 +91,12 @@ export async function POST(request: NextRequest) {
     // 收集所有文件路径
     const files: { name: string; path: string }[] = [];
     for (const mod of bothMods) {
-      const filePath = path.join(config.path, 'mods', mod.filename);
+      let filePath: string;
+      if (mod.category === 'client-only') {
+        filePath = path.join(config.path, 'mods', '.client', mod.filename);
+      } else {
+        filePath = path.join(config.path, 'mods', mod.filename);
+      }
       if (fs.existsSync(filePath)) {
         files.push({ name: mod.filename, path: filePath });
       }

@@ -65,14 +65,19 @@ export async function POST(request: NextRequest) {
     // 下载文件到服务端目录
     const config = getConfig();
     if (config.path) {
-      const modsDir = path.join(config.path, 'mods');
-      if (!fs.existsSync(modsDir)) {
-        fs.mkdirSync(modsDir, { recursive: true });
+      // 根据分类决定存放目录
+      const isClientOnly = env.category === 'client-only';
+      const targetDir = isClientOnly 
+        ? path.join(config.path, 'mods', '.client')
+        : path.join(config.path, 'mods');
+      
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
       }
       
       const { downloadFile } = await import('@/lib/modrinth');
       const fileData = await downloadFile(primaryFile.url);
-      fs.writeFileSync(path.join(modsDir, primaryFile.filename), Buffer.from(fileData));
+      fs.writeFileSync(path.join(targetDir, primaryFile.filename), Buffer.from(fileData));
     }
     
     // 创建模组记录
@@ -92,6 +97,7 @@ export async function POST(request: NextRequest) {
       description: project.description,
       versionNumber: version.version_number,
       enabled: true, // 新模组默认启用
+      recommended: false, // 客户端模组默认不推荐
     };
     
     addMod(mod);
@@ -129,17 +135,21 @@ export async function DELETE(request: NextRequest) {
       );
     }
     
-    // 删除文件（从 mods 和 disabled 目录）
+    // 删除文件（从 mods、disabled 和 client 目录）
     const config = getConfig();
     if (config.path && mod.filename) {
       const modsPath = path.join(config.path, 'mods', mod.filename);
       const disabledPath = path.join(config.path, 'mods', '.disabled', mod.filename);
+      const clientPath = path.join(config.path, 'mods', '.client', mod.filename);
       
       if (fs.existsSync(modsPath)) {
         fs.unlinkSync(modsPath);
       }
       if (fs.existsSync(disabledPath)) {
         fs.unlinkSync(disabledPath);
+      }
+      if (fs.existsSync(clientPath)) {
+        fs.unlinkSync(clientPath);
       }
     }
     
@@ -186,8 +196,75 @@ export async function PATCH(request: NextRequest) {
       );
     }
     
+    const oldCategory = mods[modIndex].category;
+    const newCategory = category as 'both' | 'server-only' | 'client-only';
+    
+    // 如果分类发生变化，需要移动文件
+    if (oldCategory !== newCategory) {
+      const config = getConfig();
+      if (config.path && mods[modIndex].filename) {
+        const modsDir = path.join(config.path, 'mods');
+        const disabledDir = path.join(modsDir, '.disabled');
+        const clientDir = path.join(modsDir, '.client');
+        const filename = mods[modIndex].filename;
+        
+        // 可能的文件位置
+        const modsPath = path.join(modsDir, filename);
+        const disabledPath = path.join(disabledDir, filename);
+        const clientPath = path.join(clientDir, filename);
+        
+        // 确定当前文件位置
+        let currentPath: string | null = null;
+        if (fs.existsSync(modsPath)) {
+          currentPath = modsPath;
+        } else if (fs.existsSync(disabledPath)) {
+          currentPath = disabledPath;
+        } else if (fs.existsSync(clientPath)) {
+          currentPath = clientPath;
+        }
+        
+        if (currentPath) {
+          try {
+            // 确定目标位置
+            let targetPath: string;
+            if (newCategory === 'client-only') {
+              // 切换到客户端：移动到 .client/
+              if (!fs.existsSync(clientDir)) {
+                fs.mkdirSync(clientDir, { recursive: true });
+              }
+              targetPath = clientPath;
+              // 同时启用（客户端模组没有禁用概念）
+              mods[modIndex].enabled = true;
+            } else if (mods[modIndex].enabled === false) {
+              // 切换到其他分类但当前禁用：移动到 .disabled/
+              if (!fs.existsSync(disabledDir)) {
+                fs.mkdirSync(disabledDir, { recursive: true });
+              }
+              targetPath = disabledPath;
+            } else {
+              // 切换到其他分类且启用：移动到 mods/
+              targetPath = modsPath;
+            }
+            
+            // 移动文件（如果目标不同）
+            if (currentPath !== targetPath) {
+              fs.renameSync(currentPath, targetPath);
+            }
+          } catch (fileError) {
+            console.error('File move error during category change:', fileError);
+            // 文件操作失败继续更新数据库
+          }
+        }
+      }
+      
+      // 切换到客户端时，清除推荐状态
+      if (newCategory === 'client-only') {
+        mods[modIndex].recommended = false;
+      }
+    }
+    
     // 更新分类
-    mods[modIndex].category = category as 'both' | 'server-only' | 'client-only';
+    mods[modIndex].category = newCategory;
     saveMods(mods);
     
     return NextResponse.json({ success: true, mod: mods[modIndex] });
@@ -200,7 +277,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// 切换模组启用状态（PUT 方法）
+// 切换模组启用状态或客户端模组推荐状态（PUT 方法）
 export async function PUT(request: NextRequest) {
   try {
     const { id } = await request.json();
@@ -223,6 +300,15 @@ export async function PUT(request: NextRequest) {
     }
     
     const mod = mods[modIndex];
+    
+    // 客户端模组：切换推荐状态（文件不移动，始终在 mods/ 目录）
+    if (mod.category === 'client-only') {
+      mods[modIndex].recommended = !mods[modIndex].recommended;
+      saveMods(mods);
+      return NextResponse.json({ success: true, mod: mods[modIndex], action: 'recommended' });
+    }
+    
+    // 双端和服务端模组：切换启用状态（移动文件）
     const newEnabled = !mod.enabled;
     
     // 移动文件
@@ -264,7 +350,7 @@ export async function PUT(request: NextRequest) {
     mods[modIndex].enabled = newEnabled;
     saveMods(mods);
     
-    return NextResponse.json({ success: true, mod: mods[modIndex] });
+    return NextResponse.json({ success: true, mod: mods[modIndex], action: 'enabled' });
   } catch (error) {
     console.error('Toggle mod error:', error);
     return NextResponse.json(

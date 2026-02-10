@@ -39,5 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# others
 AGENTS.md
-data/mods.json
+
+# data
+data/

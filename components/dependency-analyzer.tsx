@@ -455,13 +455,14 @@ export function DependencyAnalyzer({
                   <motion.div
                     key="refresh"
                     className="absolute"
-                    initial={{ opacity: 0, scale: 0.3, rotate: -90 }}
+                    initial={{ opacity: 0, scale: 0, rotate: -180 }}
                     animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                    exit={{ opacity: 0, scale: 0.2 }}
+                    exit={{ opacity: 0, scale: 0.5, rotate: 90 }}
                     transition={{
                       type: 'spring',
-                      stiffness: 500,
-                      damping: 30,
+                      stiffness: 260,
+                      damping: 12,
+                      mass: 1.2,
                     }}
                   >
                     {/* 外圈脉冲 */}

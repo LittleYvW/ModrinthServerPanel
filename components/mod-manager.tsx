@@ -13,7 +13,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check, Power, PowerOff, Star, StarOff, Download } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check, Power, PowerOff, Star, StarOff, Download, ArrowUpCircle, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { 
   fadeIn, 
@@ -23,6 +24,7 @@ import {
   cardHover,
   dropdownMenu 
 } from '@/lib/animations';
+import { useDownloadQueue } from '@/lib/download-queue';
 
 interface Mod {
   id: string;
@@ -48,6 +50,27 @@ interface CategorizedMods {
   clientOnly: Mod[];
 }
 
+interface UpdateInfo {
+  modId: string;
+  name: string;
+  slug: string;
+  currentVersion: string;
+  targetVersion: string;
+  targetVersionId: string | null;
+  hasUpdate: boolean;
+  releaseDate: string;
+  changelog?: string;
+  newCategory?: string;
+  error?: boolean;
+}
+
+interface UpdateSummary {
+  total: number;
+  hasUpdates: number;
+  upToDate: number;
+  errors: number;
+}
+
 export function ModManager() {
   const [mods, setMods] = useState<CategorizedMods>({ both: [], serverOnly: [], clientOnly: [] });
   const [loading, setLoading] = useState(true);
@@ -57,6 +80,16 @@ export function ModManager() {
   const [toggling, setToggling] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [batchDownloading, setBatchDownloading] = useState(false);
+  
+  // 更新检查状态
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updates, setUpdates] = useState<Map<string, UpdateInfo>>(new Map());
+  const [updateSummary, setUpdateSummary] = useState<UpdateSummary | null>(null);
+  const [showOnlyUpdates, setShowOnlyUpdates] = useState(false);
+  const [showCheckIcon, setShowCheckIcon] = useState(false);
+  
+  // 下载队列
+  const { addTask } = useDownloadQueue();
 
   useEffect(() => {
     fetchMods();
@@ -130,11 +163,63 @@ export function ModManager() {
     }
   };
 
-  // 判断模组是否显示为禁用状态
-  const isModDisabled = (mod: Mod) => {
-    // 客户端模组始终视为启用（文件始终在 mods/ 目录）
-    if (mod.category === 'client-only') return false;
-    return mod.enabled === false;
+  // 检查更新
+  const checkUpdates = async () => {
+    setCheckingUpdates(true);
+    setShowCheckIcon(false);
+    try {
+      const res = await fetch('/api/mods/check-updates');
+      if (res.ok) {
+        const data = await res.json();
+        const updateMap = new Map<string, UpdateInfo>();
+        data.updates.forEach((u: UpdateInfo) => {
+          if (u.hasUpdate) {
+            updateMap.set(u.modId, u);
+          }
+        });
+        setUpdates(updateMap);
+        setUpdateSummary(data.summary);
+      }
+    } catch (error) {
+      console.error('Failed to check updates:', error);
+    } finally {
+      // 延迟显示勾选图标，产生弹性切换效果
+      setTimeout(() => {
+        setCheckingUpdates(false);
+        setShowCheckIcon(true);
+        // 2秒后恢复原始图标
+        setTimeout(() => setShowCheckIcon(false), 2000);
+      }, 500);
+    }
+  };
+
+  // 更新单个模组 - 加入下载队列
+  const updateMod = (mod: Mod) => {
+    const updateInfo = updates.get(mod.id);
+    if (!updateInfo || !updateInfo.targetVersionId) return;
+    
+    // 使用下载队列
+    addTask({
+      modId: mod.id,
+      modName: `${mod.name} (更新)`,
+      versionId: updateInfo.targetVersionId,
+      versionNumber: updateInfo.targetVersion,
+      filename: mod.filename,
+      iconUrl: mod.iconUrl,
+    });
+    
+    // 从更新列表中移除（因为已经在下载队列中）
+    const newUpdates = new Map(updates);
+    newUpdates.delete(mod.id);
+    setUpdates(newUpdates);
+    
+    // 更新统计
+    if (updateSummary) {
+      setUpdateSummary({
+        ...updateSummary,
+        hasUpdates: Math.max(0, updateSummary.hasUpdates - 1),
+      });
+    }
   };
 
   // 下载模组
@@ -169,7 +254,6 @@ export function ModManager() {
     try {
       for (const mod of mods.clientOnly) {
         await downloadMod(mod);
-        // 添加延迟避免浏览器阻塞
         await new Promise(resolve => setTimeout(resolve, 300));
       }
     } catch (error) {
@@ -177,6 +261,11 @@ export function ModManager() {
     } finally {
       setBatchDownloading(false);
     }
+  };
+
+  const isModDisabled = (mod: Mod) => {
+    if (mod.category === 'client-only') return false;
+    return mod.enabled === false;
   };
 
   const getCategoryIcon = (category: string) => {
@@ -290,8 +379,21 @@ export function ModManager() {
     );
   };
 
+  // 更新标记组件
+  const UpdateBadge = ({ mod }: { mod: Mod }) => {
+    const updateInfo = updates.get(mod.id);
+    if (!updateInfo || !updateInfo.hasUpdate) return null;
+    
+    return (
+      <Badge className="bg-[#00d17a]/20 text-[#00d17a] border-0 text-[10px] animate-pulse">
+        <ArrowUpCircle className="w-3 h-3 mr-1" />
+        {updateInfo.currentVersion} → {updateInfo.targetVersion}
+      </Badge>
+    );
+  };
+
   const ModList = ({ 
-    mods, 
+    mods: modList, 
     category, 
     showBatchDownload = false,
     onBatchDownload,
@@ -302,121 +404,202 @@ export function ModManager() {
     showBatchDownload?: boolean;
     onBatchDownload?: () => void;
     batchDownloading?: boolean;
-  }) => (
-    <Card className="border-[#2a2a2a] bg-[#151515]">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-base text-white">
-          <div className="flex items-center gap-2">
-            {getCategoryIcon(category)}
-            {category === 'both' && '双端模组'}
-            {category === 'server-only' && '纯服务端模组'}
-            {category === 'client-only' && '纯客户端模组'}
-            <Badge className={`${getCategoryColor(category)} border-0`}>
-              {mods.length}
-            </Badge>
-          </div>
-          {/* 客户端模组批量下载按钮 */}
-          {showBatchDownload && onBatchDownload && (
-            <motion.div whileTap={{ scale: 0.96 }}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onBatchDownload}
-                disabled={batchDownloading}
-                className="border-[#9b59b6]/50 text-[#9b59b6] hover:text-[#9b59b6] hover:bg-[#9b59b6]/10 hover:border-[#9b59b6] text-xs h-7"
-              >
-                {batchDownloading ? (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                    className="mr-1"
-                  >
-                    <Loader2 className="w-3 h-3" />
-                  </motion.div>
-                ) : (
-                  <Download className="w-3 h-3 mr-1" />
-                )}
-                下载全部
-              </Button>
-            </motion.div>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {mods.length === 0 ? (
-          <motion.div 
-            className="text-center py-6 text-[#707070]"
-            variants={springScale}
-          >
-            <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">暂无模组</p>
-          </motion.div>
-        ) : (
-          <ScrollArea className="h-[300px]">
-            <motion.div 
-              className="space-y-2"
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-            >
-              {mods.map((mod) => (
-                <motion.div
-                  key={mod.id}
-                  variants={listItem}
-                  whileHover={!isModDisabled(mod) ? { x: 4 } : {}}
-                  className={cn(
-                    'flex items-center gap-3 p-3 rounded-lg group',
-                    !isModDisabled(mod)
-                      ? 'bg-[#1a1a1a] hover:bg-[#1f1f1f]'
-                      : 'bg-[#1a1a1a]/50 opacity-60'
-                  )}
+  }) => {
+    // 根据筛选条件过滤
+    const filteredMods = showOnlyUpdates
+      ? modList.filter(m => updates.has(m.id) && updates.get(m.id)?.hasUpdate)
+      : modList;
+    
+    return (
+      <Card className="border-[#2a2a2a] bg-[#151515]">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base text-white">
+            <div className="flex items-center gap-2">
+              {getCategoryIcon(category)}
+              {category === 'both' && '双端模组'}
+              {category === 'server-only' && '纯服务端模组'}
+              {category === 'client-only' && '纯客户端模组'}
+              <Badge className={`${getCategoryColor(category)} border-0`}>
+                {filteredMods.length}
+                {showOnlyUpdates && ` / ${modList.length}`}
+              </Badge>
+            </div>
+            {/* 客户端模组批量下载按钮 */}
+            {showBatchDownload && onBatchDownload && !showOnlyUpdates && (
+              <motion.div whileTap={{ scale: 0.96 }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onBatchDownload}
+                  disabled={batchDownloading}
+                  className="border-[#9b59b6]/50 text-[#9b59b6] hover:text-[#9b59b6] hover:bg-[#9b59b6]/10 hover:border-[#9b59b6] text-xs h-7"
                 >
-                  {/* 图标 */}
-                  <div className="w-10 h-10 rounded bg-[#262626] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {mod.iconUrl ? (
-                      <img
-                        src={mod.iconUrl}
-                        alt={mod.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Package className="w-5 h-5 text-[#707070]" />
+                  {batchDownloading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                      className="mr-1"
+                    >
+                      <Loader2 className="w-3 h-3" />
+                    </motion.div>
+                  ) : (
+                    <Download className="w-3 h-3 mr-1" />
+                  )}
+                  下载全部
+                </Button>
+              </motion.div>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredMods.length === 0 ? (
+            <motion.div 
+              className="text-center py-6 text-[#707070]"
+              variants={springScale}
+            >
+              <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">
+                {showOnlyUpdates ? '没有可更新的模组' : '暂无模组'}
+              </p>
+            </motion.div>
+          ) : (
+            <ScrollArea className="h-[300px]">
+              <motion.div 
+                className="space-y-2"
+                variants={staggerContainer}
+                initial="hidden"
+                animate="visible"
+              >
+                {filteredMods.map((mod) => (
+                  <motion.div
+                    key={mod.id}
+                    variants={listItem}
+                    whileHover={!isModDisabled(mod) ? { x: 4 } : {}}
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg group relative',
+                      !isModDisabled(mod)
+                        ? updates.has(mod.id) && updates.get(mod.id)?.hasUpdate
+                          ? 'bg-[#00d17a]/5 border border-[#00d17a]/20 hover:bg-[#00d17a]/10'
+                          : 'bg-[#1a1a1a] hover:bg-[#1f1f1f]'
+                        : 'bg-[#1a1a1a]/50 opacity-60'
                     )}
-                  </div>
+                  >
+                    {/* 更新指示器 */}
+                    {updates.has(mod.id) && updates.get(mod.id)?.hasUpdate && (
+                      <motion.div
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#00d17a] rounded-r-full"
+                        initial={{ scaleY: 0 }}
+                        animate={{ scaleY: 1 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      />
+                    )}
 
-                  {/* 信息 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-medium text-white text-sm truncate">
-                        {mod.name}
-                      </h4>
-                      <motion.a
-                        href={`https://modrinth.com/mod/${mod.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <ExternalLink className="w-3 h-3 text-[#707070] hover:text-[#00d17a]" />
-                      </motion.a>
+                    {/* 图标 */}
+                    <div className="w-10 h-10 rounded bg-[#262626] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {mod.iconUrl ? (
+                        <img
+                          src={mod.iconUrl}
+                          alt={mod.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="w-5 h-5 text-[#707070]" />
+                      )}
                     </div>
-                    <p className="text-xs text-[#707070] truncate">
-                      {mod.filename}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs border-[#2a2a2a] text-[#707070]">
-                        v{mod.versionNumber || '?'}
-                      </Badge>
-                      {/* 分类选择器 */}
-                      <CategorySelector mod={mod} />
-                    </div>
-                  </div>
 
-                  {/* 客户端模组：推荐按钮 + 下载按钮 */}
-                  {mod.category === 'client-only' ? (
-                    <>
-                      {/* 推荐按钮 */}
+                    {/* 信息 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-medium text-white text-sm truncate">
+                          {mod.name}
+                        </h4>
+                        {/* 更新标记 */}
+                        <UpdateBadge mod={mod} />
+                        <motion.a
+                          href={`https://modrinth.com/mod/${mod.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <ExternalLink className="w-3 h-3 text-[#707070] hover:text-[#00d17a]" />
+                        </motion.a>
+                      </div>
+                      <p className="text-xs text-[#707070] truncate">
+                        {mod.filename}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <Badge variant="outline" className="text-xs border-[#2a2a2a] text-[#707070]">
+                          v{mod.versionNumber || '?'}
+                        </Badge>
+                        {/* 分类选择器 */}
+                        <CategorySelector mod={mod} />
+                      </div>
+                    </div>
+
+                    {/* 客户端模组：推荐按钮 + 下载按钮 */}
+                    {mod.category === 'client-only' ? (
+                      <>
+                        {/* 推荐按钮 */}
+                        <motion.div whileTap={{ scale: 0.85 }}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => toggleMod(mod.id)}
+                            disabled={toggling === mod.id}
+                            className={cn(
+                              'h-8 w-8 p-0',
+                              mod.recommended
+                                ? 'text-[#f1c40f] hover:text-[#f39c12] hover:bg-[#f1c40f]/10'
+                                : 'text-[#707070] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10'
+                            )}
+                            title={mod.recommended ? '点击取消推荐' : '点击推荐此模组'}
+                          >
+                            {toggling === mod.id ? (
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                              >
+                                <Loader2 className="w-4 h-4" />
+                              </motion.div>
+                            ) : mod.recommended ? (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                              >
+                                <Star className="w-4 h-4 fill-current" />
+                              </motion.div>
+                            ) : (
+                              <StarOff className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </motion.div>
+                        {/* 下载按钮 */}
+                        <motion.div whileTap={{ scale: 0.85 }}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => downloadMod(mod)}
+                            disabled={downloading === mod.id}
+                            className="h-8 w-8 p-0 text-[#707070] hover:text-[#00d17a] hover:bg-[#00d17a]/10"
+                            title="下载此模组"
+                          >
+                            {downloading === mod.id ? (
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                              >
+                                <Loader2 className="w-4 h-4" />
+                              </motion.div>
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </motion.div>
+                      </>
+                    ) : (
                       <motion.div whileTap={{ scale: 0.85 }}>
                         <Button
                           size="sm"
@@ -425,11 +608,11 @@ export function ModManager() {
                           disabled={toggling === mod.id}
                           className={cn(
                             'h-8 w-8 p-0',
-                            mod.recommended
-                              ? 'text-[#f1c40f] hover:text-[#f39c12] hover:bg-[#f1c40f]/10'
-                              : 'text-[#707070] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10'
+                            mod.enabled !== false
+                              ? 'text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/10'
+                              : 'text-[#707070] hover:text-[#a0a0a0] hover:bg-[#2a2a2a]'
                           )}
-                          title={mod.recommended ? '点击取消推荐' : '点击推荐此模组'}
+                          title={mod.enabled !== false ? '点击禁用' : '点击启用'}
                         >
                           {toggling === mod.id ? (
                             <motion.div
@@ -438,126 +621,84 @@ export function ModManager() {
                             >
                               <Loader2 className="w-4 h-4" />
                             </motion.div>
-                          ) : mod.recommended ? (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                            >
-                              <Star className="w-4 h-4 fill-current" />
-                            </motion.div>
+                          ) : mod.enabled !== false ? (
+                            <Power className="w-4 h-4" />
                           ) : (
-                            <StarOff className="w-4 h-4" />
+                            <PowerOff className="w-4 h-4" />
                           )}
                         </Button>
                       </motion.div>
-                      {/* 下载按钮 */}
-                      <motion.div whileTap={{ scale: 0.85 }}>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => downloadMod(mod)}
-                          disabled={downloading === mod.id}
-                          className="h-8 w-8 p-0 text-[#707070] hover:text-[#00d17a] hover:bg-[#00d17a]/10"
-                          title="下载此模组"
-                        >
-                          {downloading === mod.id ? (
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                            >
-                              <Loader2 className="w-4 h-4" />
-                            </motion.div>
-                          ) : (
-                            <Download className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </motion.div>
-                    </>
-                  ) : (
-                    <motion.div whileTap={{ scale: 0.85 }}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => toggleMod(mod.id)}
-                        disabled={toggling === mod.id}
-                        className={cn(
-                          'h-8 w-8 p-0',
-                          mod.enabled !== false
-                            ? 'text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/10'
-                            : 'text-[#707070] hover:text-[#a0a0a0] hover:bg-[#2a2a2a]'
-                        )}
-                        title={mod.enabled !== false ? '点击禁用' : '点击启用'}
-                      >
-                        {toggling === mod.id ? (
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                          >
-                            <Loader2 className="w-4 h-4" />
-                          </motion.div>
-                        ) : mod.enabled !== false ? (
-                          <Power className="w-4 h-4" />
-                        ) : (
-                          <PowerOff className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </motion.div>
-                  )}
+                    )}
 
-                  {/* 删除按钮 */}
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                    {/* 更新按钮 */}
+                    {updates.has(mod.id) && updates.get(mod.id)?.hasUpdate && (
                       <motion.div whileTap={{ scale: 0.85 }}>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 w-8 p-0 text-[#707070] hover:text-[#e74c3c] hover:bg-[#e74c3c]/10"
+                          onClick={() => updateMod(mod)}
+                          className="h-8 w-8 p-0 text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/20"
+                          title={`更新到 v${updates.get(mod.id)?.targetVersion}`}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <ArrowUpCircle className="w-4 h-4" />
                         </Button>
                       </motion.div>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-white">
-                          确认删除
-                        </AlertDialogTitle>
-                        <AlertDialogDescription className="text-[#a0a0a0]">
-                          确定要删除模组 &quot;{mod.name}&quot; 吗？这将同时删除服务器上的文件。
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-[#262626] border-[#2a2a2a] text-white hover:bg-[#2a2a2a]">
-                          取消
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => deleteMod(mod.id)}
-                          disabled={deleting === mod.id}
-                          className="bg-[#e74c3c] hover:bg-[#c0392b] text-white"
-                        >
-                          {deleting === mod.id ? (
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                            >
-                              <Loader2 className="w-4 h-4" />
-                            </motion.div>
-                          ) : (
-                            '删除'
-                          )}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </motion.div>
-              ))}
-            </motion.div>
-          </ScrollArea>
-        )}
-      </CardContent>
-    </Card>
-  );
+                    )}
+
+                    {/* 删除按钮 */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <motion.div whileTap={{ scale: 0.85 }}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-[#707070] hover:text-[#e74c3c] hover:bg-[#e74c3c]/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </motion.div>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-white">
+                            确认删除
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-[#a0a0a0]">
+                            确定要删除模组 &quot;{mod.name}&quot; 吗？这将同时删除服务器上的文件。
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-[#262626] border-[#2a2a2a] text-white hover:bg-[#2a2a2a]">
+                            取消
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMod(mod.id)}
+                            disabled={deleting === mod.id}
+                            className="bg-[#e74c3c] hover:bg-[#c0392b] text-white"
+                          >
+                            {deleting === mod.id ? (
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                              >
+                                <Loader2 className="w-4 h-4" />
+                              </motion.div>
+                            ) : (
+                              '删除'
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (loading) {
     return (
@@ -573,56 +714,199 @@ export function ModManager() {
   }
 
   return (
-    <motion.div 
-      className="space-y-4"
-      initial="hidden"
-      animate="visible"
-      variants={fadeIn}
-    >
-      <div className="flex justify-end">
-        <motion.div whileTap={{ scale: 0.96 }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refreshMods}
-            disabled={refreshing}
-            className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
-          >
-            <motion.div
-              className="mr-2"
-              animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
-              transition={{ duration: 2, ease: 'linear', repeat: refreshing ? Infinity : 0 }}
-            >
-              <RefreshCw className="w-4 h-4" />
+    <TooltipProvider>
+      <motion.div 
+        className="space-y-4"
+        initial="hidden"
+        animate="visible"
+        variants={fadeIn}
+      >
+        {/* 操作栏 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {/* 检查更新按钮 */}
+            <motion.div whileTap={{ scale: 0.96 }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={checkUpdates}
+                disabled={checkingUpdates}
+                className="border-[#2a2a2a] text-[#a0a0a0] hover:text-[#00d17a] hover:border-[#00d17a]/50"
+              >
+                <div className="relative w-4 h-4 mr-2">
+                  <AnimatePresence mode="wait">
+                    {checkingUpdates ? (
+                      <motion.div
+                        key="spinning"
+                        className="absolute inset-0"
+                        initial={{ scale: 0, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        exit={{ scale: 0, rotate: 180 }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 12, mass: 1.2 }}
+                      >
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                        >
+                          <RefreshCw className="w-4 h-4 text-[#00d17a]" />
+                        </motion.div>
+                      </motion.div>
+                    ) : showCheckIcon ? (
+                      <motion.div
+                        key="check"
+                        className="absolute inset-0"
+                        initial={{ scale: 0, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        exit={{ scale: 0, rotate: 180 }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 12 }}
+                      >
+                        <Check className="w-4 h-4 text-[#00d17a]" />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="sparkles"
+                        className="absolute inset-0"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 12 }}
+                      >
+                        <Sparkles className="w-4 h-4" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+                检查更新
+              </Button>
             </motion.div>
-            刷新
-          </Button>
-        </motion.div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <ModList mods={mods.both} category="both" />
-        <ModList mods={mods.serverOnly} category="server-only" />
-      </div>
-
-      <AnimatePresence>
-        {mods.clientOnly.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <ModList 
-              mods={mods.clientOnly} 
-              category="client-only" 
-              showBatchDownload={true}
-              onBatchDownload={downloadAllClientMods}
-              batchDownloading={batchDownloading}
-            />
+            
+            {/* 更新统计 */}
+            {updateSummary && updateSummary.hasUpdates > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-2"
+              >
+                <Badge className="bg-[#00d17a]/20 text-[#00d17a] border-0">
+                  <ArrowUpCircle className="w-3 h-3 mr-1" />
+                  {updateSummary.hasUpdates} 个可更新
+                </Badge>
+                
+                {/* 仅显示可更新筛选 */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowOnlyUpdates(!showOnlyUpdates)}
+                  className={cn(
+                    'h-7 px-2 text-xs',
+                    showOnlyUpdates 
+                      ? 'text-[#00d17a] bg-[#00d17a]/10' 
+                      : 'text-[#707070] hover:text-white'
+                  )}
+                >
+                  {showOnlyUpdates ? (
+                    <>
+                      <X className="w-3 h-3 mr-1" />
+                      显示全部
+                    </>
+                  ) : (
+                    <>
+                      <FilterIcon className="w-3 h-3 mr-1" />
+                      仅看更新
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+            )}
+          </div>
+          
+          {/* 刷新按钮 - 弹性旋转动画 */}
+          <motion.div whileTap={{ scale: 0.96 }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshMods}
+              disabled={refreshing}
+              className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
+            >
+              <div className="relative w-4 h-4 mr-2">
+                <AnimatePresence mode="wait">
+                  {refreshing ? (
+                    <motion.div
+                      key="spinning"
+                      className="absolute inset-0"
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      exit={{ scale: 0, rotate: 180 }}
+                      transition={{ type: 'spring', stiffness: 260, damping: 12, mass: 1.2 }}
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </motion.div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="static"
+                      className="absolute inset-0"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      transition={{ type: 'spring', stiffness: 260, damping: 12 }}
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              刷新
+            </Button>
           </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <ModList mods={mods.both} category="both" />
+          <ModList mods={mods.serverOnly} category="server-only" />
+        </div>
+
+        <AnimatePresence>
+          {mods.clientOnly.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <ModList 
+                mods={mods.clientOnly} 
+                category="client-only" 
+                showBatchDownload={true}
+                onBatchDownload={downloadAllClientMods}
+                batchDownloading={batchDownloading}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </TooltipProvider>
+  );
+}
+
+// 筛选图标
+function FilterIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      className={className} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </svg>
   );
 }

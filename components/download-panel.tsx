@@ -432,6 +432,7 @@ function DownloadPanelContent() {
                   <AnimatePresence>
                     {pendingTasks > 0 && (
                       <motion.div
+                        key="pending-badge"
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
@@ -446,6 +447,7 @@ function DownloadPanelContent() {
                     )}
                     {completedTasks > 0 && (
                       <motion.div
+                        key="completed-badge"
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
@@ -460,6 +462,7 @@ function DownloadPanelContent() {
                     )}
                     {failedTasks > 0 && (
                       <motion.div
+                        key="failed-badge"
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}

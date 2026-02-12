@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Download, Package, Check, Loader2, ExternalLink, Plus, ListPlus } from 'lucide-react';
+import { Search, Download, Package, Check, Loader2, ExternalLink, Plus, ListPlus, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDownloadQueue } from '@/lib/download-queue';
+import { DependencyAnalyzer } from '@/components/dependency-analyzer';
 
 interface SearchResult {
   project_id: string;
@@ -33,6 +34,14 @@ interface Version {
   game_versions: string[];
   date_published?: string;
   changelog?: string;
+  dependencies?: Dependency[];
+}
+
+interface Dependency {
+  version_id: string | null;
+  project_id: string;
+  dependency_type: 'required' | 'optional' | 'incompatible' | 'embedded';
+  file_name?: string;
 }
 
 interface ServerConfig {
@@ -50,6 +59,8 @@ export function ModSearch() {
   const [addedToQueue, setAddedToQueue] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
+  const [analyzerOpen, setAnalyzerOpen] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   const { addTask, tasks } = useDownloadQueue();
 
   const searchMods = async () => {
@@ -236,6 +247,11 @@ export function ModSearch() {
       gameVersionMatch,
       loaderMatch
     };
+  };
+
+  const openDependencyAnalyzer = (version: Version) => {
+    setSelectedVersion(version);
+    setAnalyzerOpen(true);
   };
 
   return (
@@ -478,28 +494,16 @@ export function ModSearch() {
                       </div>
                       <Button
                         size="sm"
-                        onClick={() => addToDownloadQueue(version)}
-                        disabled={addedToQueue === version.id}
+                        onClick={() => openDependencyAnalyzer(version)}
                         className={`
-                          ${addedToQueue === version.id 
-                            ? 'bg-[#00d17a] text-black' 
-                            : compatibility.isCompatible
-                              ? 'bg-[#00d17a] hover:bg-[#00c06e] text-black'
-                              : 'bg-[#2a2a2a] hover:bg-[#333] text-white border border-[#3a3a3a]'
+                          ${compatibility.isCompatible
+                            ? 'bg-[#00d17a] hover:bg-[#00c06e] text-black'
+                            : 'bg-[#2a2a2a] hover:bg-[#333] text-white border border-[#3a3a3a]'
                           }
                         `}
                       >
-                        {addedToQueue === version.id ? (
-                          <>
-                            <Check className="w-4 h-4 mr-1" />
-                            已添加
-                          </>
-                        ) : (
-                          <>
-                            <ListPlus className="w-4 h-4 mr-1" />
-                            {compatibility.isCompatible ? '添加' : '仍添加'}
-                          </>
-                        )}
+                        <ShieldCheck className="w-4 h-4 mr-1" />
+                        {compatibility.isCompatible ? '检查' : '仍检查'}
                       </Button>
                     </div>
                   );
@@ -509,6 +513,21 @@ export function ModSearch() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 依赖分析器对话框 */}
+      <DependencyAnalyzer
+        isOpen={analyzerOpen}
+        onClose={() => setAnalyzerOpen(false)}
+        version={selectedVersion}
+        selectedMod={selectedMod}
+        serverConfig={serverConfig}
+        onAdd={() => {
+          if (selectedVersion && selectedMod) {
+            addToDownloadQueue(selectedVersion);
+          }
+          setAnalyzerOpen(false);
+        }}
+      />
     </div>
   );
 }

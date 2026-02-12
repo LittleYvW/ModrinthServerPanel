@@ -346,3 +346,141 @@ export const shimmer = {
     transition: { duration: 2, ease: 'linear', repeat: Infinity },
   },
 };
+
+// ===== 依赖分析器专用动画 =====
+
+// 分析阶段动画
+export const analysisPhase: Variants = {
+  hidden: (index: number) => ({
+    opacity: 0,
+    x: -20,
+    transition: { delay: index * 0.1 },
+  }),
+  visible: (index: number) => ({
+    opacity: 1,
+    x: 0,
+    transition: { 
+      delay: index * 0.1,
+      duration: 0.3,
+      ease: easings.enter,
+    },
+  }),
+};
+
+// 依赖项动画
+export const dependencyItem: Variants = {
+  hidden: { 
+    opacity: 0, 
+    x: -10,
+    scale: 0.98,
+  },
+  visible: { 
+    opacity: 1, 
+    x: 0,
+    scale: 1,
+    transition: { 
+      duration: 0.25,
+      ease: easings.spring,
+    },
+  },
+  exit: {
+    opacity: 0,
+    x: 10,
+    scale: 0.98,
+    transition: { duration: 0.15 },
+  },
+};
+
+// 状态徽章动画
+export const statusBadge: Variants = {
+  hidden: { 
+    scale: 0,
+    opacity: 0,
+  },
+  visible: { 
+    scale: 1,
+    opacity: 1,
+    transition: { 
+      type: 'spring',
+      stiffness: 500,
+      damping: 15,
+    },
+  },
+};
+
+// 扫描线动画
+export const scanLine = {
+  animate: {
+    x: ['-100%', '100%'],
+    transition: { 
+      duration: 1.5, 
+      ease: 'linear' as const, 
+      repeat: Infinity,
+    },
+  },
+};
+
+// 分析脉冲动画
+export const analysisPulse = {
+  animate: {
+    scale: [1, 1.05, 1],
+    opacity: [0.8, 1, 0.8],
+    transition: { 
+      duration: 1.5, 
+      ease: 'easeInOut' as const, 
+      repeat: Infinity,
+    },
+  },
+};
+
+// 结果项交错动画
+export const resultStagger: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+// 成功检查动画
+export const successCheck: Variants = {
+  hidden: { 
+    scale: 0,
+    rotate: -180,
+  },
+  visible: { 
+    scale: 1,
+    rotate: 0,
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 15,
+    },
+  },
+};
+
+// 警告抖动动画
+export const warningShake = {
+  animate: {
+    x: [0, -3, 3, -3, 3, 0],
+    transition: { 
+      duration: 0.4,
+      ease: 'easeInOut' as const,
+    },
+  },
+};
+
+// 数据流动画
+export const dataFlow = {
+  animate: {
+    backgroundPosition: ['0% 0%', '100% 0%'],
+    transition: { 
+      duration: 1, 
+      ease: 'linear' as const, 
+      repeat: Infinity,
+    },
+  },
+};

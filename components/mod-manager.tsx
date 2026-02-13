@@ -899,15 +899,15 @@ export function ModManager() {
               className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
             >
               <div className="relative w-4 h-4 mr-2">
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode="popLayout">
                   {refreshing ? (
                     <motion.div
                       key="spinning"
                       className="absolute inset-0"
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      exit={{ scale: 0, rotate: 180 }}
-                      transition={{ type: 'spring', stiffness: 260, damping: 12, mass: 1.2 }}
+                      initial={{ scale: 0.5, opacity: 0, rotate: -90 }}
+                      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                      exit={{ scale: 0.5, opacity: 0, rotate: 90 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 20, mass: 0.8 }}
                     >
                       <motion.div
                         animate={{ rotate: 360 }}
@@ -920,10 +920,10 @@ export function ModManager() {
                     <motion.div
                       key="static"
                       className="absolute inset-0"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
-                      transition={{ type: 'spring', stiffness: 260, damping: 12 }}
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.3, opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                     >
                       <RefreshCw className="w-4 h-4" />
                     </motion.div>

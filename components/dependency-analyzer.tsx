@@ -935,7 +935,10 @@ export function DependencyAnalyzer({
                         <div className="flex items-center gap-2">
                           <ShieldCheck className="w-5 h-5 text-[#00d17a]" />
                           <span className="text-white">
-                            {dependencies.filter((d) => d.status === 'installed').length} 已满足
+                            {(() => {
+                              const count = dependencies.filter((d) => d.status === 'installed').length;
+                              return count === 0 ? '无条件' : `${count} 已满足`;
+                            })()}
                           </span>
                         </div>
                         {missingDependencies.length > 0 && (

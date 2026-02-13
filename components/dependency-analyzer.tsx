@@ -91,9 +91,10 @@ interface DependencyAnalysis {
   slug: string;
   iconUrl?: string;
   type: 'required' | 'optional' | 'incompatible' | 'embedded';
-  status: 'installed' | 'missing' | 'conflict' | 'optional-missing';
+  status: 'installed' | 'missing' | 'conflict' | 'optional-missing' | 'version-mismatch';
   installedMod?: InstalledMod;
   specifiedVersionId?: string | null;
+  specifiedVersionNumber?: string;
   description?: string;
 }
 
@@ -220,9 +221,23 @@ export function DependencyAnalyzer({
       if (dep.dependency_type === 'incompatible') {
         status = installedMod ? 'conflict' : 'installed';
       } else if (dep.dependency_type === 'optional') {
-        status = installedMod ? 'installed' : 'optional-missing';
+        if (installedMod) {
+          // 检查版本是否匹配
+          status = (dep.version_id && dep.version_id !== installedMod.versionId) 
+            ? 'version-mismatch' 
+            : 'installed';
+        } else {
+          status = 'optional-missing';
+        }
       } else {
-        status = installedMod ? 'installed' : 'missing';
+        if (installedMod) {
+          // 检查版本是否匹配
+          status = (dep.version_id && dep.version_id !== installedMod.versionId) 
+            ? 'version-mismatch' 
+            : 'installed';
+        } else {
+          status = 'missing';
+        }
       }
 
       analysis.push({
@@ -234,14 +249,40 @@ export function DependencyAnalyzer({
         status,
         installedMod,
         specifiedVersionId: dep.version_id,
+        specifiedVersionNumber: undefined,
         description: undefined,
       });
     }
 
-    // 获取缺失依赖的项目信息
+    // 获取缺失或版本不匹配的依赖项目信息
     const missingDeps = analysis.filter(
-      (a) => a.status === 'missing' || a.status === 'optional-missing'
+      (a) => a.status === 'missing' || a.status === 'optional-missing' || a.status === 'version-mismatch'
     );
+
+    // 获取版本不匹配依赖的版本号信息
+    const versionMismatchDeps = analysis.filter((a): a is DependencyAnalysis & { specifiedVersionId: string } => 
+      a.status === 'version-mismatch' && !!a.specifiedVersionId
+    );
+    if (versionMismatchDeps.length > 0) {
+      try {
+        const versionIds = versionMismatchDeps.map((d) => d.specifiedVersionId).join(',');
+        const res = await fetch(`/api/version?ids=${versionIds}`);
+        if (res.ok) {
+          const versions = await res.json();
+          const versionsArray = Array.isArray(versions) ? versions : [versions];
+          for (const dep of analysis) {
+            if (dep.status === 'version-mismatch' && dep.specifiedVersionId) {
+              const versionInfo = versionsArray.find((v: any) => v.id === dep.specifiedVersionId);
+              if (versionInfo) {
+                dep.specifiedVersionNumber = versionInfo.version_number;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[DependencyAnalyzer] Failed to fetch version numbers:', error);
+      }
+    }
 
     if (missingDeps.length > 0) {
       try {
@@ -300,6 +341,7 @@ export function DependencyAnalyzer({
   };
 
   const fetchVersionsForDependency = async (dep: DependencyAnalysis) => {
+
     setSelectedMissingDep(dep);
     setLoadingVersions(true);
     setAvailableVersions([]);
@@ -311,51 +353,72 @@ export function DependencyAnalyzer({
         body: JSON.stringify({ projectId: dep.projectId }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        // 如果API指定了版本，优先使用
-        if (dep.specifiedVersionId) {
-          const specifiedVersion = data.versions?.find((v: any) => v.id === dep.specifiedVersionId);
-          if (specifiedVersion) {
-            // 直接添加到队列
-            addDependencyToQueue(specifiedVersion);
-            setLoadingVersions(false);
-            return;
-          }
-        }
-        setAvailableVersions(data.versions || []);
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        console.error('[DependencyAnalyzer] API error:', data.error);
+        setAvailableVersions([]);
+        return;
       }
+
+      const versions = Array.isArray(data.versions) ? data.versions : [];
+
+      // 如果API指定了版本，优先使用
+      if (dep.specifiedVersionId) {
+        const specifiedVersion = versions.find((v: any) => v.id === dep.specifiedVersionId);
+        if (specifiedVersion) {
+          // 直接添加到队列（传入 dep 避免状态未更新）
+          await addDependencyToQueue(specifiedVersion, dep);
+          setLoadingVersions(false);
+          return;
+        }
+        // 找不到指定版本时，回退到显示版本列表
+      }
+      setAvailableVersions(versions);
     } catch (error) {
-      console.error('Failed to fetch versions:', error);
+      console.error('[DependencyAnalyzer] Failed to fetch versions:', error);
+      setAvailableVersions([]);
     } finally {
       setLoadingVersions(false);
     }
   };
 
-  const addDependencyToQueue = async (depVersion: any) => {
-    if (!selectedMissingDep) return;
+  const addDependencyToQueue = async (depVersion: any, dep?: DependencyAnalysis, isReplace = false) => {
+    // 使用传入的 dep 或状态中的 selectedMissingDep
+    const targetDep = dep || selectedMissingDep;
+    if (!targetDep) return;
 
     const primaryFile = depVersion.files?.find((f: any) => f.primary) || depVersion.files?.[0];
 
+    // 如果是替换操作，先删除旧版本
+    if (isReplace && targetDep.installedMod) {
+      try {
+        await fetch(`/api/mods?id=${targetDep.installedMod.id}&versionId=${targetDep.installedMod.versionId}`, {
+          method: 'DELETE',
+        });
+      } catch (error) {
+        console.error('Failed to delete old version:', error);
+      }
+    }
+
     // 添加到下载队列
     addTask({
-      modId: selectedMissingDep.projectId,
-      modName: selectedMissingDep.name,
+      modId: targetDep.projectId,
+      modName: targetDep.name,
       versionId: depVersion.id,
       versionNumber: depVersion.version_number,
-      filename: primaryFile?.filename || `${selectedMissingDep.slug}-${depVersion.version_number}.jar`,
-      iconUrl: selectedMissingDep.iconUrl,
+      filename: primaryFile?.filename || `${targetDep.slug}-${depVersion.version_number}.jar`,
+      iconUrl: targetDep.iconUrl,
     });
 
     // 更新状态
     setMissingDependencies((prev) =>
-      prev.filter((d) => d.projectId !== selectedMissingDep.projectId)
+      prev.filter((d) => d.projectId !== targetDep.projectId)
     );
 
     // 更新依赖列表状态
     setDependencies((prev) =>
       prev.map((d) =>
-        d.projectId === selectedMissingDep.projectId
+        d.projectId === targetDep.projectId
           ? { ...d, status: 'installed' as const }
           : d
       )
@@ -363,6 +426,46 @@ export function DependencyAnalyzer({
 
     setSelectedMissingDep(null);
     setAvailableVersions([]);
+  };
+
+  // 处理版本替换（用于 version-mismatch 状态）
+  const handleReplaceVersion = async (dep: DependencyAnalysis) => {
+    if (!dep.specifiedVersionId) return;
+
+    setSelectedMissingDep(dep);
+    setLoadingVersions(true);
+    setAvailableVersions([]);
+
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: dep.projectId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        console.error('[DependencyAnalyzer] API error:', data.error);
+        setAvailableVersions([]);
+        return;
+      }
+
+      const versions = Array.isArray(data.versions) ? data.versions : [];
+      const specifiedVersion = versions.find((v: any) => v.id === dep.specifiedVersionId);
+
+      if (specifiedVersion) {
+        // 直接替换为指定版本
+        await addDependencyToQueue(specifiedVersion, dep, true);
+      } else {
+        // 找不到指定版本，显示版本列表让用户选择
+        setAvailableVersions(versions);
+      }
+    } catch (error) {
+      console.error('[DependencyAnalyzer] Failed to fetch versions:', error);
+      setAvailableVersions([]);
+    } finally {
+      setLoadingVersions(false);
+    }
   };
 
   const handleAddAll = () => {
@@ -426,6 +529,8 @@ export function DependencyAnalyzer({
         return <ShieldX className="w-5 h-5 text-[#e74c3c]" />;
       case 'optional-missing':
         return <Info className="w-5 h-5 text-[#707070]" />;
+      case 'version-mismatch':
+        return <RefreshCw className="w-5 h-5 text-[#e67e22]" />;
     }
   };
 
@@ -439,6 +544,8 @@ export function DependencyAnalyzer({
         return '冲突';
       case 'optional-missing':
         return '可选';
+      case 'version-mismatch':
+        return '版本不匹配';
     }
   };
 
@@ -690,7 +797,12 @@ export function DependencyAnalyzer({
                   ) : availableVersions.length === 0 ? (
                     <div className="text-center py-8 text-[#707070]">
                       <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                      <p>没有找到兼容的版本</p>
+                      <p>没有找到可用版本</p>
+                      <p className="text-xs mt-2 text-[#505050]">
+                        {selectedMissingDep?.specifiedVersionId 
+                          ? `指定版本 ID: ${selectedMissingDep.specifiedVersionId}`
+                          : '该项目可能没有发布版本'}
+                      </p>
                     </div>
                   ) : (
                     <ScrollArea className="h-[300px] w-full">
@@ -840,6 +952,14 @@ export function DependencyAnalyzer({
                             </span>
                           </div>
                         )}
+                        {dependencies.some((d) => d.status === 'version-mismatch') && (
+                          <div className="flex items-center gap-2">
+                            <RefreshCw className="w-5 h-5 text-[#e67e22]" />
+                            <span className="text-[#e67e22]">
+                              {dependencies.filter((d) => d.status === 'version-mismatch').length} 需更新
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -860,6 +980,8 @@ export function DependencyAnalyzer({
                               ? 'bg-[#e74c3c]/5 border-[#e74c3c]/30'
                               : dep.status === 'missing'
                               ? 'bg-[#f1c40f]/5 border-[#f1c40f]/30'
+                              : dep.status === 'version-mismatch'
+                              ? 'bg-[#e67e22]/5 border-[#e67e22]/30'
                               : 'bg-[#151515] border-[#2a2a2a]'
                           }`}
                         >
@@ -891,6 +1013,15 @@ export function DependencyAnalyzer({
                               >
                                 {getTypeLabel(dep.type)}
                               </Badge>
+                              {dep.specifiedVersionId && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] h-5 px-1.5 border-[#00d17a]/50 text-[#00d17a] bg-[#00d17a]/10"
+                                  title={`指定版本 ID: ${dep.specifiedVersionId}`}
+                                >
+                                  指定版本
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span
@@ -901,11 +1032,15 @@ export function DependencyAnalyzer({
                                     ? 'text-[#e74c3c]'
                                     : dep.status === 'missing'
                                     ? 'text-[#f1c40f]'
+                                    : dep.status === 'version-mismatch'
+                                    ? 'text-[#e67e22]'
                                     : 'text-[#707070]'
                                 }`}
                               >
                                 {dep.status === 'installed' && dep.installedMod
                                   ? `已安装 v${dep.installedMod.versionNumber || '?'}`
+                                  : dep.status === 'version-mismatch' && dep.installedMod
+                                  ? `当前 v${dep.installedMod.versionNumber || '?'} → 需 v${dep.specifiedVersionNumber || dep.specifiedVersionId?.slice(0, 8) || '?'}`
                                   : getStatusText(dep.status)}
                               </span>
                             </div>
@@ -921,6 +1056,19 @@ export function DependencyAnalyzer({
                               >
                                 <ListPlus className="w-3 h-3 mr-1" />
                                 添加
+                              </Button>
+                            </motion.div>
+                          )}
+
+                          {dep.status === 'version-mismatch' && (
+                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                              <Button
+                                size="sm"
+                                onClick={() => handleReplaceVersion(dep)}
+                                className="bg-[#e67e22] hover:bg-[#d35400] text-white text-xs h-7"
+                              >
+                                <RefreshCw className="w-3 h-3 mr-1" />
+                                替换
                               </Button>
                             </motion.div>
                           )}

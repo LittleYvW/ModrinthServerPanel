@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -126,12 +127,14 @@ export default function Home() {
       </footer>
 
       {/* 登录对话框 */}
-      {showLogin && (
-        <LoginDialog
-          onLogin={handleLogin}
-          onCancel={() => setShowLogin(false)}
-        />
-      )}
+      <AnimatePresence mode="wait">
+        {showLogin && (
+          <LoginDialog
+            onLogin={handleLogin}
+            onCancel={() => setShowLogin(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* 下载队列面板 */}
       <DownloadPanelContainer />

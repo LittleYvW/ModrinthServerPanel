@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import {
   dropdownMenu 
 } from '@/lib/animations';
 import { useDownloadQueue } from '@/lib/download-queue';
+import { DependencyAnalyzer } from '@/components/dependency-analyzer';
 
 interface Mod {
   id: string;
@@ -62,6 +63,29 @@ interface UpdateInfo {
   changelog?: string;
   newCategory?: string;
   error?: boolean;
+}
+
+interface VersionInfo {
+  id: string;
+  version_number: string;
+  client_support: string;
+  server_support: string;
+  files: { filename: string; primary: boolean }[];
+  loaders: string[];
+  game_versions: string[];
+  dependencies?: Dependency[];
+}
+
+interface Dependency {
+  version_id: string | null;
+  project_id: string;
+  dependency_type: 'required' | 'optional' | 'incompatible' | 'embedded';
+  file_name?: string;
+}
+
+interface ServerConfig {
+  minecraftVersion: string;
+  loader: string;
 }
 
 interface UpdateSummary {
@@ -231,7 +255,9 @@ interface ModListProps {
   toggleMod: (id: string) => void;
   deleteMod: (id: string) => void;
   updateModCategory: (id: string, category: 'both' | 'server-only' | 'client-only') => void;
-  updateMod: (mod: Mod) => void;
+  onUpdateMod?: (mod: Mod) => void;
+  loadingUpdateVersion?: boolean;
+  updateTargetMod?: Mod | null;
 }
 
 const ModList = ({ 
@@ -251,7 +277,9 @@ const ModList = ({
   toggleMod,
   deleteMod,
   updateModCategory,
-  updateMod,
+  onUpdateMod,
+  loadingUpdateVersion,
+  updateTargetMod,
 }: ModListProps) => {
   // 根据筛选条件过滤
   const filteredMods = showOnlyUpdates
@@ -485,16 +513,26 @@ const ModList = ({
                   )}
 
                   {/* 更新按钮 */}
-                  {updates.has(mod.id) && updates.get(mod.id)?.hasUpdate && (
+                  {updates.has(mod.id) && updates.get(mod.id)?.hasUpdate && onUpdateMod && (
                     <motion.div whileTap={{ scale: 0.85 }}>
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => updateMod(mod)}
+                        onClick={() => onUpdateMod(mod)}
+                        disabled={loadingUpdateVersion && updateTargetMod?.id === mod.id}
                         className="h-8 w-8 p-0 text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/20"
                         title={`更新到 v${updates.get(mod.id)?.targetVersion}`}
                       >
-                        <ArrowUpCircle className="w-4 h-4" />
+                        {loadingUpdateVersion && updateTargetMod?.id === mod.id ? (
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                          >
+                            <Loader2 className="w-4 h-4" />
+                          </motion.div>
+                        ) : (
+                          <ArrowUpCircle className="w-4 h-4" />
+                        )}
                       </Button>
                     </motion.div>
                   )}
@@ -571,6 +609,46 @@ function FilterIcon({ className }: { className?: string }) {
   );
 }
 
+// 更新分析器包装组件 - 使用 useMemo 确保对象引用稳定，防止不必要的重新分析
+interface UpdateAnalyzerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  updateTargetMod: Mod;
+  updateTargetVersion: VersionInfo;
+  serverConfig: ServerConfig | null;
+  onConfirm: () => void;
+}
+
+function UpdateAnalyzer({ isOpen, onClose, updateTargetMod, updateTargetVersion, serverConfig, onConfirm }: UpdateAnalyzerProps) {
+  // 使用 useMemo 缓存对象，避免每次渲染创建新对象导致依赖分析器重新分析
+  const selectedMod = useMemo(() => ({
+    project_id: updateTargetMod.id,
+    slug: updateTargetMod.slug,
+    title: updateTargetMod.name,
+    description: updateTargetMod.description || '',
+    icon_url: updateTargetMod.iconUrl || '',
+    client_side: updateTargetMod.environment.client,
+    server_side: updateTargetMod.environment.server,
+    categories: [],
+    versions: [],
+  }), [updateTargetMod]);
+
+  // 同样缓存 version 对象
+  const version = useMemo(() => updateTargetVersion, [updateTargetVersion]);
+
+  return (
+    <DependencyAnalyzer
+      isOpen={isOpen}
+      onClose={onClose}
+      version={version}
+      selectedMod={selectedMod}
+      serverConfig={serverConfig}
+      onAdd={onConfirm}
+      mode="update"
+    />
+  );
+}
+
 // ===== 主组件 =====
 
 export function ModManager() {
@@ -595,6 +673,13 @@ export function ModManager() {
   
   // 下载队列
   const { addTask } = useDownloadQueue();
+  
+  // 更新分析器状态
+  const [isUpdateAnalyzerOpen, setIsUpdateAnalyzerOpen] = useState(false);
+  const [updateTargetVersion, setUpdateTargetVersion] = useState<VersionInfo | null>(null);
+  const [updateTargetMod, setUpdateTargetMod] = useState<Mod | null>(null);
+  const [loadingUpdateVersion, setLoadingUpdateVersion] = useState(false);
+  const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
 
   useEffect(() => {
     fetchMods();
@@ -699,24 +784,100 @@ export function ModManager() {
     }
   }, []);
 
-  // 更新单个模组 - 加入下载队列
-  const updateMod = useCallback((mod: Mod) => {
+  // 获取服务端配置
+  const fetchServerConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/config');
+      if (res.ok) {
+        const config = await res.json();
+        setServerConfig({
+          minecraftVersion: config.minecraftVersion,
+          loader: config.loader,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch server config:', error);
+    }
+  }, []);
+
+  // 打开更新分析器
+  const openUpdateAnalyzer = useCallback(async (mod: Mod) => {
     const updateInfo = updates.get(mod.id);
     if (!updateInfo || !updateInfo.targetVersionId) return;
     
-    // 使用下载队列
+    setLoadingUpdateVersion(true);
+    setUpdateTargetMod(mod);
+    
+    // 获取服务端配置
+    await fetchServerConfig();
+    
+    try {
+      // 获取目标版本详情（含依赖）
+      const res = await fetch(`/api/version?versionId=${updateInfo.targetVersionId}`);
+      if (res.ok) {
+        const versionData = await res.json();
+        setUpdateTargetVersion(versionData);
+        setIsUpdateAnalyzerOpen(true);
+      } else {
+        console.error('Failed to fetch version details');
+        // 如果获取失败，直接加入下载队列（降级处理）
+        addTask({
+          modId: mod.id,
+          modName: `${mod.name} (更新)`,
+          versionId: updateInfo.targetVersionId,
+          versionNumber: updateInfo.targetVersion,
+          filename: mod.filename,
+          iconUrl: mod.iconUrl,
+        });
+        
+        // 从更新列表中移除
+        const newUpdates = new Map(updates);
+        newUpdates.delete(mod.id);
+        setUpdates(newUpdates);
+        
+        if (updateSummary) {
+          setUpdateSummary({
+            ...updateSummary,
+            hasUpdates: Math.max(0, updateSummary.hasUpdates - 1),
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch version details:', error);
+      // 如果获取失败，直接加入下载队列（降级处理）
+      addTask({
+        modId: mod.id,
+        modName: `${mod.name} (更新)`,
+        versionId: updateInfo.targetVersionId,
+        versionNumber: updateInfo.targetVersion,
+        filename: mod.filename,
+        iconUrl: mod.iconUrl,
+      });
+    } finally {
+      setLoadingUpdateVersion(false);
+    }
+  }, [updates, updateSummary, addTask, fetchServerConfig]);
+
+  // 处理更新确认 - 从依赖分析器回调
+  const handleUpdateConfirm = useCallback(() => {
+    if (!updateTargetMod || !updateTargetVersion) return;
+    
+    const updateInfo = updates.get(updateTargetMod.id);
+    if (!updateInfo) return;
+    
+    // 加入下载队列
     addTask({
-      modId: mod.id,
-      modName: `${mod.name} (更新)`,
-      versionId: updateInfo.targetVersionId,
-      versionNumber: updateInfo.targetVersion,
-      filename: mod.filename,
-      iconUrl: mod.iconUrl,
+      modId: updateTargetMod.id,
+      modName: `${updateTargetMod.name} (更新)`,
+      versionId: updateTargetVersion.id,
+      versionNumber: updateTargetVersion.version_number,
+      filename: updateTargetMod.filename,
+      iconUrl: updateTargetMod.iconUrl,
     });
     
-    // 从更新列表中移除（因为已经在下载队列中）
+    // 从更新列表中移除
     const newUpdates = new Map(updates);
-    newUpdates.delete(mod.id);
+    newUpdates.delete(updateTargetMod.id);
     setUpdates(newUpdates);
     
     // 更新统计
@@ -726,7 +887,19 @@ export function ModManager() {
         hasUpdates: Math.max(0, updateSummary.hasUpdates - 1),
       });
     }
-  }, [addTask, updates, updateSummary]);
+    
+    // 关闭分析器并清理状态
+    setIsUpdateAnalyzerOpen(false);
+    setUpdateTargetVersion(null);
+    setUpdateTargetMod(null);
+  }, [addTask, updateTargetMod, updateTargetVersion, updates, updateSummary]);
+
+  // 处理更新分析器关闭
+  const handleUpdateAnalyzerClose = useCallback(() => {
+    setIsUpdateAnalyzerOpen(false);
+    setUpdateTargetVersion(null);
+    setUpdateTargetMod(null);
+  }, []);
 
   // 下载模组
   const downloadMod = useCallback(async (mod: Mod) => {
@@ -950,7 +1123,9 @@ export function ModManager() {
             toggleMod={toggleMod}
             deleteMod={deleteMod}
             updateModCategory={updateModCategory}
-            updateMod={updateMod}
+            onUpdateMod={openUpdateAnalyzer}
+            loadingUpdateVersion={loadingUpdateVersion}
+            updateTargetMod={updateTargetMod}
           />
           <ModList 
             mods={mods.serverOnly} 
@@ -966,7 +1141,9 @@ export function ModManager() {
             toggleMod={toggleMod}
             deleteMod={deleteMod}
             updateModCategory={updateModCategory}
-            updateMod={updateMod}
+            onUpdateMod={openUpdateAnalyzer}
+            loadingUpdateVersion={loadingUpdateVersion}
+            updateTargetMod={updateTargetMod}
           />
         </div>
 
@@ -995,11 +1172,25 @@ export function ModManager() {
                 toggleMod={toggleMod}
                 deleteMod={deleteMod}
                 updateModCategory={updateModCategory}
-                updateMod={updateMod}
+                onUpdateMod={openUpdateAnalyzer}
+                loadingUpdateVersion={loadingUpdateVersion}
+                updateTargetMod={updateTargetMod}
               />
             </motion.div>
           )}
         </AnimatePresence>
+        
+        {/* 更新依赖分析器 */}
+        {updateTargetMod && updateTargetVersion && (
+          <UpdateAnalyzer 
+            isOpen={isUpdateAnalyzerOpen}
+            onClose={handleUpdateAnalyzerClose}
+            updateTargetMod={updateTargetMod}
+            updateTargetVersion={updateTargetVersion}
+            serverConfig={serverConfig}
+            onConfirm={handleUpdateConfirm}
+          />
+        )}
       </motion.div>
     </TooltipProvider>
   );

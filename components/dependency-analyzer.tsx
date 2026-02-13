@@ -111,6 +111,7 @@ interface DependencyAnalyzerProps {
   selectedMod: SearchResult | null;
   serverConfig: ServerConfig | null;
   onAdd: () => void;
+  mode?: 'add' | 'update';
 }
 
 export function DependencyAnalyzer({
@@ -120,6 +121,7 @@ export function DependencyAnalyzer({
   selectedMod,
   serverConfig,
   onAdd,
+  mode = 'add',
 }: DependencyAnalyzerProps) {
   const [analysisState, setAnalysisState] = useState<'scanning' | 'analyzing' | 'complete'>('scanning');
   const [phases, setPhases] = useState<AnalysisPhase[]>([
@@ -619,7 +621,7 @@ export function DependencyAnalyzer({
               </AnimatePresence>
             </div>
             <div>
-              <div className="text-lg">依赖分析器</div>
+              <div className="text-lg">{mode === 'update' ? '更新分析器' : '依赖分析器'}</div>
               {selectedMod && (
                 <div className="text-sm text-[#707070] font-normal flex items-center gap-2">
                   {selectedMod.icon_url && (
@@ -1113,7 +1115,7 @@ export function DependencyAnalyzer({
                     ) : (
                       <Button onClick={handleAddAll} className="bg-[#00d17a] hover:bg-[#00c06e] text-black">
                         <ShieldCheck className="w-4 h-4 mr-2" />
-                        添加
+                        {mode === 'update' ? '确认更新' : '添加'}
                       </Button>
                     )}
                   </div>

@@ -1163,14 +1163,32 @@ export function DependencyAnalyzer({
                           )}
 
                           {dep.status === 'conflict' && dep.installedMod && (
-                            <a
-                              href={`https://modrinth.com/mod/${dep.installedMod.slug}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#707070] hover:text-[#00d17a] transition-colors"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
+                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                              <Button
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    await fetch(`/api/mods?id=${dep.installedMod!.id}&versionId=${dep.installedMod!.versionId}`, {
+                                      method: 'DELETE',
+                                    });
+                                    // 更新依赖状态为未安装
+                                    setDependencies((prev) =>
+                                      prev.map((d) =>
+                                        d.projectId === dep.projectId
+                                          ? { ...d, status: 'not-installed' as const, installedMod: undefined }
+                                          : d
+                                      )
+                                    );
+                                  } catch (error) {
+                                    console.error('Failed to delete conflicting mod:', error);
+                                  }
+                                }}
+                                className="bg-[#e74c3c] hover:bg-[#c0392b] text-white text-xs h-7"
+                              >
+                                <Ban className="w-3 h-3 mr-1" />
+                                删除
+                              </Button>
+                            </motion.div>
                           )}
                         </motion.div>
                       ))}

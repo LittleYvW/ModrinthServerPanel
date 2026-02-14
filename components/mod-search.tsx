@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Download, Package, Check, Loader2, ExternalLink, Plus, ListPlus, ShieldCheck, ShieldAlert, Heart, Calendar, User } from 'lucide-react';
+import { Search, Download, Package, Check, Loader2, ExternalLink, Plus, ListPlus, ShieldCheck, ShieldAlert, Heart, Calendar, User, Info, Github, MessageCircle, Book, ExternalLink as ExternalLinkIcon, Tag, Layers, Hash, Code, Globe, Award } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDownloadQueue } from '@/lib/download-queue';
 import { DependencyAnalyzer } from '@/components/dependency-analyzer';
@@ -29,6 +29,17 @@ interface SearchResult {
   author: string;
   latest_version: string;
   license: string;
+  project_type: string;
+  gallery: string[];
+  source_url?: string;
+  issues_url?: string;
+  wiki_url?: string;
+  discord_url?: string;
+  donation_urls?: { id: string; platform: string; url: string }[];
+  color?: number;
+  thread_id?: string;
+  monetization_status?: string;
+  organization?: string;
 }
 
 interface Version {
@@ -101,6 +112,7 @@ export function ModSearch() {
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   const { addTask, tasks } = useDownloadQueue();
   const [installedMods, setInstalledMods] = useState<Map<string, string>>(new Map()); // versionId -> modName
+  const [detailMod, setDetailMod] = useState<SearchResult | null>(null); // 详情对话框
 
   const searchMods = async () => {
     if (!query.trim()) return;
@@ -432,6 +444,15 @@ export function ModSearch() {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => setDetailMod(mod)}
+                        className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
+                      >
+                        <Info className="w-3 h-3 mr-1" />
+                        详情
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         asChild
                         className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
                       >
@@ -611,6 +632,345 @@ export function ModSearch() {
               </div>
             </ScrollArea>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 详情展示对话框 */}
+      <Dialog open={!!detailMod} onOpenChange={() => setDetailMod(null)}>
+        <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] max-w-2xl max-h-[85vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-3">
+              {detailMod?.icon_url && (
+                <img
+                  src={detailMod.icon_url}
+                  alt=""
+                  className="w-10 h-10 rounded-lg"
+                />
+              )}
+              <div>
+                <div className="flex items-center gap-2">
+                  {detailMod?.title}
+                  {detailMod && getEnvironmentBadge(detailMod.client_side, detailMod.server_side)}
+                </div>
+                <p className="text-xs text-[#707070] font-normal">{detailMod?.slug}</p>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[calc(85vh-120px)]">
+            <div className="space-y-6 pr-4">
+              {/* 描述 */}
+              <div>
+                <h4 className="text-sm font-medium text-white mb-2 flex items-center gap-2">
+                  <Info className="w-4 h-4 text-[#00d17a]" />
+                  描述
+                </h4>
+                <p className="text-sm text-[#a0a0a0] leading-relaxed">
+                  {detailMod?.description}
+                </p>
+              </div>
+
+              {/* 统计信息卡片 */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="bg-[#151515] border border-[#2a2a2a] rounded-lg p-3 text-center">
+                  <Download className="w-5 h-5 text-[#00d17a] mx-auto mb-1" />
+                  <p className="text-lg font-semibold text-white">{detailMod ? formatNumber(detailMod.downloads) : '-'}</p>
+                  <p className="text-xs text-[#707070]">总下载量</p>
+                </div>
+                <div className="bg-[#151515] border border-[#2a2a2a] rounded-lg p-3 text-center">
+                  <Heart className="w-5 h-5 text-[#e74c3c] mx-auto mb-1" />
+                  <p className="text-lg font-semibold text-white">{detailMod ? formatNumber(detailMod.follows) : '-'}</p>
+                  <p className="text-xs text-[#707070]">关注数</p>
+                </div>
+                <div className="bg-[#151515] border border-[#2a2a2a] rounded-lg p-3 text-center">
+                  <Layers className="w-5 h-5 text-[#1b8fff] mx-auto mb-1" />
+                  <p className="text-lg font-semibold text-white">{detailMod ? formatNumber(detailMod.versions.length) : '-'}</p>
+                  <p className="text-xs text-[#707070]">版本数</p>
+                </div>
+                <div className="bg-[#151515] border border-[#2a2a2a] rounded-lg p-3 text-center">
+                  <Tag className="w-5 h-5 text-[#9b59b6] mx-auto mb-1" />
+                  <p className="text-lg font-semibold text-white">{detailMod ? detailMod.categories.length : '-'}</p>
+                  <p className="text-xs text-[#707070]">分类数</p>
+                </div>
+              </div>
+
+              {/* 基本信息 */}
+              <div>
+                <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                  <Hash className="w-4 h-4 text-[#00d17a]" />
+                  基本信息
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center justify-between bg-[#151515] border border-[#2a2a2a] rounded-lg p-3">
+                    <span className="text-[#707070] flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      作者
+                    </span>
+                    <span className="text-white">{detailMod?.author || '未知'}</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-[#151515] border border-[#2a2a2a] rounded-lg p-3">
+                    <span className="text-[#707070] flex items-center gap-2">
+                      <Award className="w-4 h-4" />
+                      许可证
+                    </span>
+                    <span className="text-white">{detailMod?.license || '未知'}</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-[#151515] border border-[#2a2a2a] rounded-lg p-3">
+                    <span className="text-[#707070] flex items-center gap-2">
+                      <Code className="w-4 h-4" />
+                      最新版本
+                    </span>
+                    <span className="text-[#00d17a] font-mono">{detailMod?.latest_version || '-'}</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-[#151515] border border-[#2a2a2a] rounded-lg p-3">
+                    <span className="text-[#707070] flex items-center gap-2">
+                      <Globe className="w-4 h-4" />
+                      项目类型
+                    </span>
+                    <span className="text-white capitalize">{detailMod?.project_type || 'mod'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 时间信息 */}
+              <div>
+                <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-[#00d17a]" />
+                  时间信息
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between bg-[#151515] border border-[#2a2a2a] rounded-lg p-3">
+                    <span className="text-[#707070]">创建时间</span>
+                    <span className="text-white">
+                      {detailMod?.date_created ? new Date(detailMod.date_created).toLocaleString('zh-CN') : '-'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between bg-[#151515] border border-[#2a2a2a] rounded-lg p-3">
+                    <span className="text-[#707070]">最后更新</span>
+                    <span className="text-white">
+                      {detailMod?.date_modified ? new Date(detailMod.date_modified).toLocaleString('zh-CN') : '-'}
+                      {detailMod && (
+                        <span className="text-[#707070] ml-2">({formatDate(detailMod.date_modified)})</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 分类 */}
+              {detailMod?.categories && detailMod.categories.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-[#00d17a]" />
+                    分类
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {detailMod.categories.map((cat) => (
+                      <Badge
+                        key={cat}
+                        variant="outline"
+                        className="border-[#2a2a2a] text-[#a0a0a0] capitalize"
+                      >
+                        {cat}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 支持的游戏版本 */}
+              {detailMod?.versions && detailMod.versions.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-[#00d17a]" />
+                    支持的游戏版本
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {detailMod.versions.slice(0, 15).map((ver) => (
+                      <Badge
+                        key={ver}
+                        variant="outline"
+                        className="border-[#2a2a2a] text-[#707070] font-mono text-xs"
+                      >
+                        {ver}
+                      </Badge>
+                    ))}
+                    {detailMod.versions.length > 15 && (
+                      <Badge variant="outline" className="border-[#2a2a2a] text-[#505050]">
+                        +{detailMod.versions.length - 15} 更多
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 外部链接 */}
+              <div>
+                <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                  <ExternalLinkIcon className="w-4 h-4 text-[#00d17a]" />
+                  外部链接
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    asChild
+                    className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
+                  >
+                    <a
+                      href={`https://modrinth.com/${detailMod?.project_type || 'mod'}/${detailMod?.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Globe className="w-4 h-4 mr-1" />
+                      Modrinth 页面
+                    </a>
+                  </Button>
+                  {detailMod?.source_url && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      asChild
+                      className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
+                    >
+                      <a href={detailMod.source_url} target="_blank" rel="noopener noreferrer">
+                        <Github className="w-4 h-4 mr-1" />
+                        源代码
+                      </a>
+                    </Button>
+                  )}
+                  {detailMod?.issues_url && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      asChild
+                      className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
+                    >
+                      <a href={detailMod.issues_url} target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="w-4 h-4 mr-1" />
+                        问题反馈
+                      </a>
+                    </Button>
+                  )}
+                  {detailMod?.wiki_url && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      asChild
+                      className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
+                    >
+                      <a href={detailMod.wiki_url} target="_blank" rel="noopener noreferrer">
+                        <Book className="w-4 h-4 mr-1" />
+                        Wiki
+                      </a>
+                    </Button>
+                  )}
+                  {detailMod?.discord_url && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      asChild
+                      className="border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
+                    >
+                      <a href={detailMod.discord_url} target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="w-4 h-4 mr-1" />
+                        Discord
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* 捐赠链接 */}
+              {detailMod?.donation_urls && detailMod.donation_urls.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-[#e74c3c]" />
+                    支持作者
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {detailMod.donation_urls.map((donation) => (
+                      <Button
+                        key={donation.id}
+                        size="sm"
+                        variant="outline"
+                        asChild
+                        className="border-[#e74c3c]/30 text-[#e74c3c] hover:bg-[#e74c3c]/10"
+                      >
+                        <a href={donation.url} target="_blank" rel="noopener noreferrer">
+                          <Heart className="w-4 h-4 mr-1" />
+                          {donation.platform}
+                        </a>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 画廊图片 */}
+              {detailMod?.gallery && detailMod.gallery.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-[#00d17a]" />
+                    画廊
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {detailMod.gallery.slice(0, 4).map((img, idx) => (
+                      <a key={idx} href={img} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={img}
+                          alt={`画廊图片 ${idx + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border border-[#2a2a2a] hover:border-[#00d17a] transition-colors"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 技术信息 */}
+              <div>
+                <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                  <Code className="w-4 h-4 text-[#00d17a]" />
+                  技术信息
+                </h4>
+                <div className="bg-[#151515] border border-[#2a2a2a] rounded-lg p-3 space-y-1 text-xs font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-[#505050]">Project ID:</span>
+                    <span className="text-[#707070]">{detailMod?.project_id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#505050]">Slug:</span>
+                    <span className="text-[#707070]">{detailMod?.slug}</span>
+                  </div>
+                  {detailMod?.organization && (
+                    <div className="flex justify-between">
+                      <span className="text-[#505050]">Organization:</span>
+                      <span className="text-[#707070]">{detailMod.organization}</span>
+                    </div>
+                  )}
+                  {detailMod?.monetization_status && (
+                    <div className="flex justify-between">
+                      <span className="text-[#505050]">Monetization:</span>
+                      <span className="text-[#707070]">{detailMod.monetization_status}</span>
+                    </div>
+                  )}
+                  {detailMod?.color && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[#505050]">Theme Color:</span>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded border border-[#2a2a2a]"
+                          style={{ backgroundColor: `#${detailMod.color.toString(16).padStart(6, '0')}` }}
+                        />
+                        <span className="text-[#707070]">#{detailMod.color.toString(16).padStart(6, '0')}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 

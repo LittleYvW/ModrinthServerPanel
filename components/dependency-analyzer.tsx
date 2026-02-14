@@ -95,7 +95,7 @@ interface DependencyAnalysis {
   slug: string;
   iconUrl?: string;
   type: 'required' | 'optional' | 'incompatible' | 'embedded';
-  status: 'installed' | 'missing' | 'conflict' | 'optional-missing' | 'version-mismatch';
+  status: 'installed' | 'missing' | 'conflict' | 'optional-missing' | 'version-mismatch' | 'not-installed';
   installedMod?: InstalledMod;
   specifiedVersionId?: string | null;
   specifiedVersionNumber?: string;
@@ -227,7 +227,7 @@ export function DependencyAnalyzer({
 
       let status: DependencyAnalysis['status'];
       if (dep.dependency_type === 'incompatible') {
-        status = installedMod ? 'conflict' : 'installed';
+        status = installedMod ? 'conflict' : 'not-installed';
       } else if (dep.dependency_type === 'optional') {
         if (installedMod) {
           // 检查版本是否匹配
@@ -262,12 +262,15 @@ export function DependencyAnalyzer({
       });
     }
 
-    // 获取缺失或版本不匹配的依赖项目信息
+    // 获取缺失、版本不匹配或冲突（未安装）的依赖项目信息
     const missingDeps = analysis.filter(
       (a) => (a.status === 'missing' || a.status === 'version-mismatch') && a.type !== 'optional'
     );
     const optionalDeps = analysis.filter(
       (a) => a.status === 'optional-missing'
+    );
+    const conflictDeps = analysis.filter(
+      (a) => a.status === 'conflict' || a.status === 'not-installed'
     );
 
     // 获取版本不匹配依赖的版本号信息
@@ -295,7 +298,7 @@ export function DependencyAnalyzer({
       }
     }
 
-    const depsNeedingInfo = [...missingDeps, ...optionalDeps];
+    const depsNeedingInfo = [...missingDeps, ...optionalDeps, ...conflictDeps];
     if (depsNeedingInfo.length > 0) {
       try {
         const projectIds = depsNeedingInfo.map((d) => d.projectId).join(',');
@@ -535,6 +538,7 @@ export function DependencyAnalyzer({
   const getStatusIcon = (status: DependencyAnalysis['status']) => {
     switch (status) {
       case 'installed':
+      case 'not-installed':
         return <ShieldCheck className="w-5 h-5 text-[#00d17a]" />;
       case 'missing':
         return <ShieldAlert className="w-5 h-5 text-[#f1c40f]" />;
@@ -551,6 +555,8 @@ export function DependencyAnalyzer({
     switch (status) {
       case 'installed':
         return '已安装';
+      case 'not-installed':
+        return '未安装';
       case 'missing':
         return '未安装';
       case 'conflict':
@@ -1109,7 +1115,7 @@ export function DependencyAnalyzer({
                             <div className="flex items-center gap-2 mt-0.5">
                               <span
                                 className={`text-xs ${
-                                  dep.status === 'installed'
+                                  dep.status === 'installed' || dep.status === 'not-installed'
                                     ? 'text-[#00d17a]'
                                     : dep.status === 'conflict'
                                     ? 'text-[#e74c3c]'

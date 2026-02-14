@@ -469,13 +469,9 @@ export const analysisPhaseContainer: Variants = {
   },
   exit: { 
     opacity: 0,
-    height: 0,
     transition: {
-      duration: 0.3,
+      duration: 0.15,
       ease: easings.exit,
-      when: 'afterChildren',
-      staggerChildren: 0.05,
-      staggerDirection: -1,
     },
   },
 };

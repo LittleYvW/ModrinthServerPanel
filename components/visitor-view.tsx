@@ -197,18 +197,19 @@ export function VisitorView() {
               </motion.div>
             ) : (
               <ScrollArea className="h-[400px]">
-                <motion.div 
-                  className="space-y-3"
-                  variants={staggerContainer}
-                  initial="hidden"
-                  animate="visible"
-                >
+                <div className="space-y-3 pr-3">
+                  <motion.div
+                    className="space-y-3"
+                    variants={staggerContainer}
+                    initial="hidden"
+                    animate="visible"
+                  >
                   {mods.both.map((mod) => (
                     <motion.div
                       key={mod.id}
                       variants={listItem}
                       whileHover={{ x: 4, backgroundColor: 'rgba(31, 31, 31, 1)' }}
-                      className="flex items-center gap-4 p-3 rounded-lg bg-[#1a1a1a] cursor-default"
+                      className="flex items-center gap-3 p-3 rounded-lg bg-[#1a1a1a] cursor-default min-w-0"
                     >
                       {/* 图标 */}
                       <div className="w-12 h-12 rounded-lg bg-[#262626] flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -224,16 +225,16 @@ export function VisitorView() {
                       </div>
 
                       {/* 信息 */}
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <h3 className="font-medium text-white truncate">{mod.name}</h3>
                         <p className="text-sm text-[#a0a0a0] truncate">
                           {mod.description || mod.filename}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs border-[#2a2a2a] text-[#a0a0a0]">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Badge variant="outline" className="text-xs border-[#2a2a2a] text-[#a0a0a0] shrink-0">
                             v{mod.versionNumber || 'unknown'}
                           </Badge>
-                          <Badge className="text-xs bg-[#00d17a]/20 text-[#00d17a] border-0">
+                          <Badge className="text-xs bg-[#00d17a]/20 text-[#00d17a] border-0 shrink-0">
                             双端
                           </Badge>
                         </div>
@@ -262,7 +263,8 @@ export function VisitorView() {
                       </motion.div>
                     </motion.div>
                   ))}
-                </motion.div>
+                  </motion.div>
+                </div>
               </ScrollArea>
             )}
           </CardContent>
@@ -323,18 +325,19 @@ export function VisitorView() {
                   以下模组为管理员推荐的客户端可选模组：
                 </p>
                 <ScrollArea className="h-[300px]">
-                  <motion.div 
-                    className="space-y-3"
-                    variants={staggerContainer}
-                    initial="hidden"
-                    animate="visible"
-                  >
+                  <div className="space-y-3 pr-3">
+                    <motion.div
+                      className="space-y-3"
+                      variants={staggerContainer}
+                      initial="hidden"
+                      animate="visible"
+                    >
                     {mods.clientOnly.map((mod) => (
                       <motion.div
                         key={mod.id}
                         variants={listItem}
                         whileHover={{ x: 4, backgroundColor: 'rgba(31, 31, 31, 1)' }}
-                        className="flex items-center gap-4 p-3 rounded-lg bg-[#1a1a1a] cursor-default"
+                        className="flex items-center gap-3 p-3 rounded-lg bg-[#1a1a1a] cursor-default min-w-0"
                       >
                         {/* 图标 */}
                         <div className="w-12 h-12 rounded-lg bg-[#262626] flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -350,16 +353,16 @@ export function VisitorView() {
                         </div>
 
                         {/* 信息 */}
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 overflow-hidden">
                           <h3 className="font-medium text-white truncate">{mod.name}</h3>
                           <p className="text-sm text-[#a0a0a0] truncate">
                             {mod.description || mod.filename}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs border-[#2a2a2a] text-[#a0a0a0]">
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-xs border-[#2a2a2a] text-[#a0a0a0] shrink-0">
                               v{mod.versionNumber || 'unknown'}
                             </Badge>
-                            <Badge className="text-xs bg-[#f1c40f]/20 text-[#f1c40f] border-0">
+                            <Badge className="text-xs bg-[#f1c40f]/20 text-[#f1c40f] border-0 shrink-0">
                               可选
                             </Badge>
                           </div>
@@ -388,7 +391,8 @@ export function VisitorView() {
                         </motion.div>
                       </motion.div>
                     ))}
-                  </motion.div>
+                    </motion.div>
+                  </div>
                 </ScrollArea>
               </CardContent>
             </Card>

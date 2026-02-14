@@ -349,20 +349,32 @@ export const shimmer = {
 
 // ===== 依赖分析器专用动画 =====
 
-// 分析阶段动画
+// 分析阶段动画（使用 transform 和 opacity，不影响布局）
 export const analysisPhase: Variants = {
   hidden: (index: number) => ({
     opacity: 0,
-    x: -20,
+    y: 15,
+    scale: 0.95,
     transition: { delay: index * 0.1 },
   }),
   visible: (index: number) => ({
     opacity: 1,
-    x: 0,
+    y: 0,
+    scale: 1,
     transition: { 
-      delay: index * 0.1,
-      duration: 0.3,
-      ease: easings.enter,
+      delay: index * 0.12,
+      duration: 0.35,
+      ease: easings.spring,
+    },
+  }),
+  exit: (index: number) => ({
+    opacity: 0,
+    y: -10,
+    scale: 0.98,
+    transition: { 
+      delay: (3 - index) * 0.05,
+      duration: 0.2,
+      ease: easings.exit,
     },
   }),
 };
@@ -442,6 +454,79 @@ export const resultStagger: Variants = {
       staggerChildren: 0.05,
       delayChildren: 0.1,
     },
+  },
+};
+
+// 分析阶段容器动画
+export const analysisPhaseContainer: Variants = {
+  hidden: { opacity: 1 },
+  visible: { 
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.1,
+    },
+  },
+  exit: { 
+    opacity: 0,
+    height: 0,
+    transition: {
+      duration: 0.3,
+      ease: easings.exit,
+      when: 'afterChildren',
+      staggerChildren: 0.05,
+      staggerDirection: -1,
+    },
+  },
+};
+
+// 扫描区域整体退出动画（仅使用 opacity，不影响布局）
+export const scanningExit: Variants = {
+  hidden: { opacity: 1 },
+  visible: { opacity: 1 },
+  exit: { 
+    opacity: 0,
+    transition: { 
+      duration: 0.25,
+      ease: easings.exit,
+      when: 'afterChildren',
+    },
+  },
+};
+
+// 结果区域进入动画（仅使用 transform，不影响布局）
+export const resultsEnter: Variants = {
+  hidden: { 
+    opacity: 0, 
+    scale: 0.96,
+    y: 16,
+  },
+  visible: { 
+    opacity: 1, 
+    scale: 1,
+    y: 0,
+    transition: { 
+      duration: 0.35,
+      ease: easings.spring,
+      delay: 0.1,
+    },
+  },
+  exit: { 
+    opacity: 0,
+    scale: 0.98,
+    y: -8,
+    transition: { duration: 0.15 },
+  },
+};
+
+// 雷达扫描区域退出动画
+export const radarExit: Variants = {
+  hidden: { opacity: 1, scale: 1 },
+  visible: { opacity: 1, scale: 1 },
+  exit: { 
+    opacity: 0,
+    scale: 0.9,
+    transition: { duration: 0.25, ease: easings.exit },
   },
 };
 

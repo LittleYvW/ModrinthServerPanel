@@ -33,6 +33,10 @@ import {
 } from 'lucide-react';
 import {
   analysisPhase,
+  analysisPhaseContainer,
+  scanningExit,
+  radarExit,
+  resultsEnter,
   dependencyItem,
   analysisPulse,
 } from '@/lib/animations';
@@ -642,11 +646,22 @@ export function DependencyAnalyzer({
 
         {/* Content */}
         <div className="p-6 pt-4">
-          {analysisState === 'scanning' ? (
+          <AnimatePresence mode="wait">
+          {analysisState !== 'complete' ? (
             /* Scanning Phase */
-            <div className="space-y-6">
+            <motion.div 
+              key="scanning"
+              className="space-y-6"
+              variants={scanningExit}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
               {/* 雷达扫描动画 */}
-              <div className="relative h-40 bg-[#151515] rounded-xl overflow-hidden flex items-center justify-center">
+              <motion.div 
+                className="relative h-40 bg-[#151515] rounded-xl overflow-hidden flex items-center justify-center"
+                variants={radarExit}
+              >
                 {/* 同心圆 */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   {[1, 2, 3].map((ring) => (
@@ -693,16 +708,26 @@ export function DependencyAnalyzer({
                 />
 
                 {/* 扫描文字 */}
-                <div className="absolute bottom-4 text-[#00d17a]/70 text-sm">正在扫描依赖...</div>
-              </div>
+                <motion.div 
+                  className="absolute bottom-4 text-[#00d17a]/70 text-sm"
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  正在扫描依赖...
+                </motion.div>
+              </motion.div>
 
               {/* Phase Indicators */}
-              <div className="space-y-3">
+              <motion.div 
+                className="space-y-3"
+                variants={analysisPhaseContainer}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
                 {phases.map((phase, index) => (
                   <motion.div
                     key={phase.id}
-                    initial="hidden"
-                    animate="visible"
                     variants={analysisPhase}
                     custom={index}
                     className={`flex items-center gap-3 p-3 rounded-lg border ${
@@ -713,7 +738,7 @@ export function DependencyAnalyzer({
                         : 'bg-[#151515]/50 border-[#2a2a2a]/50'
                     }`}
                   >
-                    <div className="w-6 h-6 flex items-center justify-center">
+                    <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
                       {phase.status === 'active' && (
                         <motion.div
                           animate={{ rotate: 360 }}
@@ -723,39 +748,58 @@ export function DependencyAnalyzer({
                         </motion.div>
                       )}
                       {phase.status === 'completed' && (
-                        <Check className="w-5 h-5 text-[#00d17a]" />
+                        <motion.div
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                        >
+                          <Check className="w-5 h-5 text-[#00d17a]" />
+                        </motion.div>
                       )}
                       {phase.status === 'pending' && (
-                        <div className="w-2 h-2 rounded-full bg-[#3a3a3a]" />
+                        <motion.div 
+                          className="w-2 h-2 rounded-full bg-[#3a3a3a]"
+                          animate={{ opacity: [0.3, 0.7, 0.3] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        />
                       )}
                     </div>
-                    <span
-                      className={`text-sm ${
-                        phase.status === 'active'
-                          ? 'text-white'
-                          : phase.status === 'completed'
-                          ? 'text-[#a0a0a0]'
-                          : 'text-[#505050]'
-                      }`}
+                    <motion.span
+                      initial={false}
+                      animate={{
+                        color: phase.status === 'active' 
+                          ? '#ffffff' 
+                          : phase.status === 'completed' 
+                          ? '#a0a0a0' 
+                          : '#505050'
+                      }}
+                      className="text-sm"
                     >
                       {phase.label}
-                    </span>
+                    </motion.span>
                   </motion.div>
                 ))}
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           ) : (
             /* Analysis Complete */
-            <AnimatePresence mode="wait">
-              {selectedMissingDep ? (
-                /* Version Selection for Missing Dependency */
-                <motion.div
-                  key="version-select"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4"
-                >
+            <motion.div
+              key="results"
+              variants={resultsEnter}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <AnimatePresence mode="wait">
+                {selectedMissingDep ? (
+                  /* Version Selection for Missing Dependency */
+                  <motion.div
+                    key="version-select"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-4"
+                  >
                   {/* 返回按钮和信息 */}
                   <div className="flex items-center gap-3">
                     <Button
@@ -921,7 +965,7 @@ export function DependencyAnalyzer({
               ) : (
                 /* Analysis Results - 无分类 */
                 <motion.div
-                  key="results"
+                  key="results-content"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -972,13 +1016,24 @@ export function DependencyAnalyzer({
 
                   {/* Dependencies List - 无分类 Tabs */}
                   <ScrollArea className="h-[240px] w-full">
-                    <div className="space-y-2 pr-3">
-                      {dependencies.map((dep, index) => (
+                    <motion.div 
+                      className="space-y-2 pr-3"
+                      initial="hidden"
+                      animate="visible"
+                      variants={{
+                        hidden: { opacity: 0 },
+                        visible: {
+                          opacity: 1,
+                          transition: {
+                            staggerChildren: 0.04,
+                            delayChildren: 0.1,
+                          },
+                        },
+                      }}
+                    >
+                      {dependencies.map((dep) => (
                         <motion.div
                           key={dep.projectId}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.03 }}
                           variants={dependencyItem}
                           className={`flex items-center gap-3 p-3 rounded-lg border ${
                             dep.status === 'conflict'
@@ -992,9 +1047,13 @@ export function DependencyAnalyzer({
                         >
                           {/* Status Icon */}
                           <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: index * 0.03 + 0.1, type: 'spring', stiffness: 500 }}
+                            variants={{
+                              hidden: { scale: 0 },
+                              visible: { 
+                                scale: 1,
+                                transition: { type: 'spring', stiffness: 500 }
+                              }
+                            }}
                           >
                             {getStatusIcon(dep.status)}
                           </motion.div>
@@ -1090,7 +1149,7 @@ export function DependencyAnalyzer({
                           )}
                         </motion.div>
                       ))}
-                    </div>
+                    </motion.div>
                   </ScrollArea>
 
                   {/* Action Buttons */}
@@ -1122,10 +1181,12 @@ export function DependencyAnalyzer({
                       </Button>
                     )}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           )}
+          </AnimatePresence>
         </div>
       </DialogContent>
     </Dialog>

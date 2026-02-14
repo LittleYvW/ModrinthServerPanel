@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -672,7 +672,7 @@ export function ModManager() {
   const [animationKey, setAnimationKey] = useState(0);
   
   // 下载队列
-  const { addTask } = useDownloadQueue();
+  const { addTask, completedTasks, tasks } = useDownloadQueue();
   
   // 更新分析器状态
   const [isUpdateAnalyzerOpen, setIsUpdateAnalyzerOpen] = useState(false);
@@ -680,6 +680,22 @@ export function ModManager() {
   const [updateTargetMod, setUpdateTargetMod] = useState<Mod | null>(null);
   const [loadingUpdateVersion, setLoadingUpdateVersion] = useState(false);
   const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
+  
+  // 当下载/更新任务完成时自动刷新模组列表
+  const prevCompletedTasksRef = useRef(completedTasks);
+  useEffect(() => {
+    if (completedTasks > prevCompletedTasksRef.current) {
+      // 有新任务完成，刷新模组列表
+      fetchMods();
+      // 同时清除更新状态（因为模组已更新）
+      if (updateTargetMod) {
+        const newUpdates = new Map(updates);
+        newUpdates.delete(updateTargetMod.id);
+        setUpdates(newUpdates);
+      }
+    }
+    prevCompletedTasksRef.current = completedTasks;
+  }, [completedTasks, updateTargetMod, updates]);
 
   useEffect(() => {
     fetchMods();

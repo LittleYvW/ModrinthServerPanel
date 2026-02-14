@@ -346,8 +346,8 @@ const ModList = ({
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
-              // 使用 key 控制：首次加载和点击刷新时触发动画，其他操作不触发
-              key={`list-${animationKey}`}
+              // 使用 key 控制：首次加载、点击刷新、切换筛选时触发动画
+              key={`list-${animationKey}-${showOnlyUpdates ? 'updates' : 'all'}`}
             >
               {filteredMods.map((mod) => (
                 <motion.div

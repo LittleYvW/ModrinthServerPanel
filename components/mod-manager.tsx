@@ -26,6 +26,7 @@ import {
 } from '@/lib/animations';
 import { useDownloadQueue } from '@/lib/download-queue';
 import { DependencyAnalyzer } from '@/components/dependency-analyzer';
+import { formatVersion } from '@/lib/version-utils';
 
 interface Mod {
   id: string;
@@ -233,7 +234,7 @@ const UpdateBadge = ({ mod, updates }: UpdateBadgeProps) => {
   return (
     <Badge className="bg-[#00d17a]/20 text-[#00d17a] border-0 text-[10px] animate-pulse">
       <ArrowUpCircle className="w-3 h-3 mr-1" />
-      {updateInfo.currentVersion} → {updateInfo.targetVersion}
+      {formatVersion(updateInfo.currentVersion)} → {formatVersion(updateInfo.targetVersion)}
     </Badge>
   );
 };
@@ -521,7 +522,7 @@ const ModList = ({
                         onClick={() => onUpdateMod(mod)}
                         disabled={loadingUpdateVersion && updateTargetMod?.id === mod.id}
                         className="h-8 w-8 p-0 text-[#00d17a] hover:text-[#00b86b] hover:bg-[#00d17a]/20"
-                        title={`更新到 v${updates.get(mod.id)?.targetVersion}`}
+                        title={`更新到 v${formatVersion(updates.get(mod.id)?.targetVersion || '')}`}
                       >
                         {loadingUpdateVersion && updateTargetMod?.id === mod.id ? (
                           <motion.div

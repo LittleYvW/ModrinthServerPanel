@@ -111,9 +111,16 @@ export function getLatestVersion(versions: string[]): string | null {
 /**
  * 格式化版本号显示
  * e.g., "1.20.1+build.1" -> "1.20.1"
+ * e.g., "1.21.1-6.0.9" -> "6.0.9" (去掉 Minecraft 版本前缀)
  */
 export function formatVersion(version: string): string {
-  return version.replace(/^v/i, '').split(/[-+]/)[0];
+  if (!version) return '';
+  // 如果版本号包含 '-'，取最后一段（通常是纯 mod 版本）
+  const parts = version.replace(/^v/i, '').split(/[-+]/);
+  if (parts.length > 1 && /^\d/.test(parts[parts.length - 1])) {
+    return parts[parts.length - 1];
+  }
+  return parts[0];
 }
 
 /**

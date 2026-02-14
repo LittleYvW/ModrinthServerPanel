@@ -62,6 +62,7 @@ export function ModSearch() {
   const [analyzerOpen, setAnalyzerOpen] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   const { addTask, tasks } = useDownloadQueue();
+  const [installedMods, setInstalledMods] = useState<Map<string, string>>(new Map()); // versionId -> modName
 
   const searchMods = async () => {
     if (!query.trim()) return;
@@ -157,6 +158,23 @@ export function ModSearch() {
     return { success: false, error: lastError || '获取版本列表失败，请重试' };
   };
 
+  // 获取已安装的模组列表
+  const fetchInstalledMods = async () => {
+    try {
+      const res = await fetch('/api/mods');
+      if (res.ok) {
+        const data = await res.json();
+        const modMap = new Map<string, string>();
+        data.mods?.forEach((mod: any) => {
+          modMap.set(mod.versionId, mod.name);
+        });
+        setInstalledMods(modMap);
+      }
+    } catch (error) {
+      console.error('Failed to fetch installed mods:', error);
+    }
+  };
+
   const showVersions = async (mod: SearchResult) => {
     // 取消之前的请求
     if (abortControllerRef.current) {
@@ -172,6 +190,9 @@ export function ModSearch() {
     setVersions([]);
     setAddedToQueue(null);
     setError('');
+    
+    // 同时获取已安装的模组列表
+    await fetchInstalledMods();
     
     const result = await fetchVersionsWithRetry(mod.project_id, abortController, 3);
     
@@ -492,19 +513,30 @@ export function ModSearch() {
                         </div>
 
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => openDependencyAnalyzer(version)}
-                        className={`
-                          ${compatibility.isCompatible
-                            ? 'bg-[#00d17a] hover:bg-[#00c06e] text-black'
-                            : 'bg-[#2a2a2a] hover:bg-[#333] text-white border border-[#3a3a3a]'
-                          }
-                        `}
-                      >
-                        <ShieldCheck className="w-4 h-4 mr-1" />
-                        {compatibility.isCompatible ? '检查' : '仍检查'}
-                      </Button>
+                      {installedMods.has(version.id) ? (
+                        <Button
+                          size="sm"
+                          disabled
+                          className="bg-[#2a2a2a] text-[#707070] border border-[#3a3a3a] cursor-not-allowed"
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          已添加
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => openDependencyAnalyzer(version)}
+                          className={`
+                            ${compatibility.isCompatible
+                              ? 'bg-[#00d17a] hover:bg-[#00c06e] text-black'
+                              : 'bg-[#2a2a2a] hover:bg-[#333] text-white border border-[#3a3a3a]'
+                            }
+                          `}
+                        >
+                          <ShieldCheck className="w-4 h-4 mr-1" />
+                          {compatibility.isCompatible ? '检查' : '仍检查'}
+                        </Button>
+                      )}
                     </div>
                   );
                 })}

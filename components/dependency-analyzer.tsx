@@ -983,15 +983,19 @@ export function DependencyAnalyzer({
                     <div className="flex-1">
                       <div className="text-sm text-[#707070] mb-1">分析结果</div>
                       <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="w-5 h-5 text-[#00d17a]" />
-                          <span className="text-white">
-                            {(() => {
-                              const count = dependencies.filter((d) => d.status === 'installed').length;
-                              return count === 0 ? '无条件' : `${count} 已满足`;
-                            })()}
-                          </span>
-                        </div>
+                        {(() => {
+                          const count = dependencies.filter((d) => d.status === 'installed').length;
+                          const hasMissing = missingDependencies.length > 0;
+                          if (count === 0 && hasMissing) return null;
+                          return (
+                            <div className="flex items-center gap-2">
+                              <ShieldCheck className="w-5 h-5 text-[#00d17a]" />
+                              <span className="text-white">
+                                {count === 0 ? '无条件' : `${count} 已满足`}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         {missingDependencies.length > 0 && (
                           <div className="flex items-center gap-2">
                             <ShieldAlert className="w-5 h-5 text-[#f1c40f]" />

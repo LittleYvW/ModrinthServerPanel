@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Download, Package, Check, Loader2, ExternalLink, Plus, ListPlus, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Search, Download, Package, Check, Loader2, ExternalLink, Plus, ListPlus, ShieldCheck, ShieldAlert, Heart, Calendar, User } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDownloadQueue } from '@/lib/download-queue';
 import { DependencyAnalyzer } from '@/components/dependency-analyzer';
@@ -22,6 +22,13 @@ interface SearchResult {
   server_side: string;
   categories: string[];
   versions: string[];
+  downloads: number;
+  follows: number;
+  date_created: string;
+  date_modified: string;
+  author: string;
+  latest_version: string;
+  license: string;
 }
 
 interface Version {
@@ -47,6 +54,37 @@ interface Dependency {
 interface ServerConfig {
   minecraftVersion: string;
   loader: string;
+}
+
+// 格式化数字（如：1.2k, 3.4M）
+function formatNumber(num: number): string {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M';
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'k';
+  }
+  return num.toString();
+}
+
+// 格式化日期为相对时间
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffMonths = Math.floor(diffDays / 30);
+  const diffYears = Math.floor(diffDays / 365);
+
+  if (diffYears > 0) return `${diffYears}年前`;
+  if (diffMonths > 0) return `${diffMonths}个月前`;
+  if (diffDays > 0) return `${diffDays}天前`;
+  if (diffHours > 0) return `${diffHours}小时前`;
+  if (diffMins > 0) return `${diffMins}分钟前`;
+  return '刚刚';
 }
 
 export function ModSearch() {
@@ -338,6 +376,28 @@ export function ModSearch() {
                       <p className="text-sm text-[#a0a0a0] mt-1 line-clamp-2">
                         {mod.description}
                       </p>
+                      {/* 统计信息 */}
+                      <div className="flex items-center gap-4 mt-2 text-xs text-[#707070]">
+                        <span className="flex items-center gap-1" title="总下载量">
+                          <Download className="w-3.5 h-3.5" />
+                          {formatNumber(mod.downloads)}
+                        </span>
+                        <span className="flex items-center gap-1" title="关注数">
+                          <Heart className="w-3.5 h-3.5" />
+                          {formatNumber(mod.follows)}
+                        </span>
+                        {mod.author && (
+                          <span className="flex items-center gap-1" title="作者">
+                            <User className="w-3.5 h-3.5" />
+                            {mod.author}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1" title="最后更新">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {formatDate(mod.date_modified)}
+                        </span>
+                      </div>
+                      {/* 分类标签 */}
                       <div className="flex items-center gap-2 mt-2">
                         {mod.categories.slice(0, 3).map((cat) => (
                           <Badge
@@ -348,6 +408,14 @@ export function ModSearch() {
                             {cat}
                           </Badge>
                         ))}
+                        {mod.categories.length > 3 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-[#2a2a2a] text-[#505050]"
+                          >
+                            +{mod.categories.length - 3}
+                          </Badge>
+                        )}
                       </div>
                     </div>
 

@@ -33,6 +33,8 @@ export async function searchMods(
       query,
       facets: facetParam,
       limit: 20,
+      // 指定需要的字段以获取更多信息
+      index: 'relevance',
     },
   });
   
@@ -139,6 +141,13 @@ export interface ModrinthProject {
   icon_url: string;
   client_side: 'required' | 'optional' | 'unsupported';
   server_side: 'required' | 'optional' | 'unsupported';
+  downloads: number;
+  follows: number;
+  date_created: string;
+  date_modified: string;
+  author: string;
+  latest_version: string;
+  license: string;
 }
 
 export interface ModrinthVersion {

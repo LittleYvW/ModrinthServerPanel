@@ -137,6 +137,7 @@ export function DependencyAnalyzer({
   const [dependencies, setDependencies] = useState<DependencyAnalysis[]>([]);
   const [installedMods, setInstalledMods] = useState<InstalledMod[]>([]);
   const [missingDependencies, setMissingDependencies] = useState<DependencyAnalysis[]>([]);
+  const [optionalDependencies, setOptionalDependencies] = useState<DependencyAnalysis[]>([]);
   const [selectedMissingDep, setSelectedMissingDep] = useState<DependencyAnalysis | null>(null);
   const [availableVersions, setAvailableVersions] = useState<any[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
@@ -155,6 +156,7 @@ export function DependencyAnalyzer({
     setDependencies([]);
     setInstalledMods([]);
     setMissingDependencies([]);
+    setOptionalDependencies([]);
     setSelectedMissingDep(null);
     setAvailableVersions([]);
     setHeaderComplete(false);
@@ -262,7 +264,10 @@ export function DependencyAnalyzer({
 
     // 获取缺失或版本不匹配的依赖项目信息
     const missingDeps = analysis.filter(
-      (a) => a.status === 'missing' || a.status === 'optional-missing' || a.status === 'version-mismatch'
+      (a) => (a.status === 'missing' || a.status === 'version-mismatch') && a.type !== 'optional'
+    );
+    const optionalDeps = analysis.filter(
+      (a) => a.status === 'optional-missing'
     );
 
     // 获取版本不匹配依赖的版本号信息
@@ -290,9 +295,10 @@ export function DependencyAnalyzer({
       }
     }
 
-    if (missingDeps.length > 0) {
+    const depsNeedingInfo = [...missingDeps, ...optionalDeps];
+    if (depsNeedingInfo.length > 0) {
       try {
-        const projectIds = missingDeps.map((d) => d.projectId).join(',');
+        const projectIds = depsNeedingInfo.map((d) => d.projectId).join(',');
         const res = await fetch(`/api/projects?ids=${projectIds}`);
         if (res.ok) {
           const projects = await res.json();
@@ -313,6 +319,7 @@ export function DependencyAnalyzer({
 
     setDependencies(analysis);
     setMissingDependencies(missingDeps);
+    setOptionalDependencies(optionalDeps);
     updatePhase('analyze', 'completed');
 
     // Phase 4: 验证兼容性
@@ -483,7 +490,7 @@ export function DependencyAnalyzer({
   );
 
   const hasRequiredMissing = dependencies.some(
-    (d) => d.type === 'required' && d.status === 'missing'
+    (d) => d.type === 'required' && (d.status === 'missing' || d.status === 'version-mismatch')
   );
 
   const getTypeColor = (type: Dependency['dependency_type']) => {
@@ -993,6 +1000,14 @@ export function DependencyAnalyzer({
                             </span>
                           </div>
                         )}
+                        {optionalDependencies.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Info className="w-5 h-5 text-[#1b8fff]" />
+                            <span className="text-[#1b8fff]">
+                              {optionalDependencies.length} 可添加
+                            </span>
+                          </div>
+                        )}
                         {dependencies.some((d) => d.status === 'conflict') && (
                           <div className="flex items-center gap-2">
                             <ShieldX className="w-5 h-5 text-[#e74c3c]" />
@@ -1158,7 +1173,7 @@ export function DependencyAnalyzer({
                       取消
                     </Button>
 
-                    {missingDependencies.length > 0 ? (
+                    {hasRequiredMissing ? (
                       <Button
                         onClick={handleAddAll}
                         className="bg-[#2a2a2a] hover:bg-[#333] text-white border border-[#3a3a3a]"

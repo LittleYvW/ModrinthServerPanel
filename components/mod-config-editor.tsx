@@ -893,7 +893,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         </div>
         
         {/* 编辑器内容 */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden relative">
           <AnimatePresence mode="wait" initial={false}>
             {viewMode === 'form' ? (
               <motion.div
@@ -902,10 +902,10 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.2 }}
-                className="h-full overflow-hidden"
+                className="h-full overflow-hidden absolute inset-0"
               >
                 <ScrollArea className="h-full w-full" type="always">
-                  <div className="p-4 space-y-3 min-h-0">
+                  <div className="p-4 space-y-3">
                     {topLevelConfigs.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center">
                         <FileCode className="w-12 h-12 text-[#3a3a3a] mb-4" />
@@ -948,7 +948,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="h-full overflow-hidden bg-[#0d0d0d]"
+                className="h-full overflow-hidden bg-[#0d0d0d] absolute inset-0"
               >
                 <ScrollArea className="h-full w-full" type="always">
                   <CodePreview content={content} type={fileType} />

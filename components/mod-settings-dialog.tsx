@@ -419,8 +419,8 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
               </div>
               
               {/* 已关联文件列表 */}
-              <TabsContent value="linked" className="flex-1 overflow-hidden mt-0 data-[state=inactive]:hidden">
-                <ScrollArea className="h-full w-full" type="always">
+              <TabsContent value="linked" className="flex-1 overflow-hidden mt-0 data-[state=inactive]:hidden relative">
+                <ScrollArea className="h-full w-full absolute inset-0" type="always">
                   <div className="px-6 pb-6">
                   {loading ? (
                     <div className="flex items-center justify-center h-32">
@@ -518,8 +518,8 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
               </TabsContent>
               
               {/* 可用文件列表 */}
-              <TabsContent value="available" className="flex-1 overflow-hidden mt-0 data-[state=inactive]:hidden">
-                <ScrollArea className="h-full w-full" type="always">
+              <TabsContent value="available" className="flex-1 overflow-hidden mt-0 data-[state=inactive]:hidden relative">
+                <ScrollArea className="h-full w-full absolute inset-0" type="always">
                   <div className="px-6 pb-6">
                   {loading ? (
                     <div className="flex items-center justify-center h-32">

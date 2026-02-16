@@ -251,7 +251,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl w-[95vw] h-[85vh] p-0 bg-[#151515] border-[#2a2a2a] overflow-hidden">
+      <DialogContent className="w-[88vw] h-[75vh] p-0 bg-[#151515] border-[#2a2a2a] overflow-hidden sm:max-w-[1100px] rounded-xl">
         {selectedFile ? (
           // 编辑器视图
           <motion.div

@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check, Power, PowerOff, Star, StarOff, Download, ArrowUpCircle, Sparkles, X } from 'lucide-react';
+import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check, Power, PowerOff, Star, StarOff, Download, ArrowUpCircle, Sparkles, X, Cog } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { 
   fadeIn, 
@@ -26,6 +26,7 @@ import {
 } from '@/lib/animations';
 import { useDownloadQueue } from '@/lib/download-queue';
 import { DependencyAnalyzer } from '@/components/dependency-analyzer';
+import { ModSettingsDialog } from '@/components/mod-settings-dialog';
 import { formatVersion } from '@/lib/version-utils';
 
 interface Mod {
@@ -259,6 +260,7 @@ interface ModListProps {
   onUpdateMod?: (mod: Mod) => void;
   loadingUpdateVersion?: boolean;
   updateTargetMod?: Mod | null;
+  onOpenSettings?: (mod: Mod) => void;
 }
 
 const ModList = ({ 
@@ -281,6 +283,7 @@ const ModList = ({
   onUpdateMod,
   loadingUpdateVersion,
   updateTargetMod,
+  onOpenSettings,
 }: ModListProps) => {
   // 根据筛选条件过滤
   const filteredMods = showOnlyUpdates
@@ -538,6 +541,21 @@ const ModList = ({
                     </motion.div>
                   )}
 
+                  {/* 设置按钮 */}
+                  {onOpenSettings && (
+                    <motion.div whileTap={{ scale: 0.85 }}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onOpenSettings(mod)}
+                        className="h-8 w-8 p-0 text-[#707070] hover:text-[#1b8fff] hover:bg-[#1b8fff]/10"
+                        title="配置设置"
+                      >
+                        <Cog className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                  )}
+
                   {/* 删除按钮 */}
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -681,6 +699,10 @@ export function ModManager() {
   const [updateTargetMod, setUpdateTargetMod] = useState<Mod | null>(null);
   const [loadingUpdateVersion, setLoadingUpdateVersion] = useState(false);
   const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
+  
+  // 模组设置对话框状态
+  const [settingsMod, setSettingsMod] = useState<Mod | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   // 当下载/更新任务完成时自动刷新模组列表
   const prevCompletedTasksRef = useRef(completedTasks);
@@ -959,6 +981,18 @@ export function ModManager() {
     }
   }, [mods.clientOnly, downloadMod]);
 
+  // 打开模组设置
+  const handleOpenSettings = useCallback((mod: Mod) => {
+    setSettingsMod(mod);
+    setIsSettingsOpen(true);
+  }, []);
+
+  // 关闭模组设置
+  const handleCloseSettings = useCallback(() => {
+    setIsSettingsOpen(false);
+    setSettingsMod(null);
+  }, []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1143,6 +1177,7 @@ export function ModManager() {
             onUpdateMod={openUpdateAnalyzer}
             loadingUpdateVersion={loadingUpdateVersion}
             updateTargetMod={updateTargetMod}
+            onOpenSettings={handleOpenSettings}
           />
           <ModList 
             mods={mods.serverOnly} 
@@ -1161,6 +1196,7 @@ export function ModManager() {
             onUpdateMod={openUpdateAnalyzer}
             loadingUpdateVersion={loadingUpdateVersion}
             updateTargetMod={updateTargetMod}
+            onOpenSettings={handleOpenSettings}
           />
         </div>
 
@@ -1192,6 +1228,7 @@ export function ModManager() {
                 onUpdateMod={openUpdateAnalyzer}
                 loadingUpdateVersion={loadingUpdateVersion}
                 updateTargetMod={updateTargetMod}
+                onOpenSettings={handleOpenSettings}
               />
             </motion.div>
           )}
@@ -1208,6 +1245,14 @@ export function ModManager() {
             onConfirm={handleUpdateConfirm}
           />
         )}
+        
+        {/* 模组设置对话框 */}
+        <ModSettingsDialog
+          modId={settingsMod?.id || ''}
+          modName={settingsMod?.name || ''}
+          isOpen={isSettingsOpen}
+          onClose={handleCloseSettings}
+        />
       </motion.div>
     </TooltipProvider>
   );

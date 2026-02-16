@@ -5,6 +5,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const MODS_FILE = path.join(DATA_DIR, 'mods.json');
 const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
+const MOD_CONFIGS_FILE = path.join(DATA_DIR, 'mod-configs.json');
 
 // 确保数据目录存在
 if (!fs.existsSync(DATA_DIR)) {
@@ -176,4 +177,111 @@ export function verifyPassword(password: string): boolean {
 export function isDefaultPassword(): boolean {
   const auth = getAuth();
   return auth.password === defaultAuth.password;
+}
+
+// ========== 模组配置文件关联 ==========
+
+// 配置文件信息
+export interface ModConfigFile {
+  path: string;           // 文件相对路径（相对于服务端目录）
+  type: 'json' | 'json5' | 'toml';  // 文件类型
+  autoDetected: boolean;  // 是否自动检测到
+  linkedAt: string;       // 关联时间
+}
+
+// 模组配置关联
+export interface ModConfig {
+  modId: string;          // 模组 ID
+  modName: string;        // 模组名称
+  files: ModConfigFile[]; // 关联的配置文件列表
+  lastScanAt?: string;    // 上次扫描时间
+}
+
+// 默认空配置
+const defaultModConfigs: ModConfig[] = [];
+
+// 获取所有模组配置关联
+export function getModConfigs(): ModConfig[] {
+  return initFile(MOD_CONFIGS_FILE, defaultModConfigs);
+}
+
+// 保存模组配置关联
+export function saveModConfigs(configs: ModConfig[]): void {
+  fs.writeFileSync(MOD_CONFIGS_FILE, JSON.stringify(configs, null, 2), 'utf-8');
+}
+
+// 获取单个模组的配置关联
+export function getModConfigById(modId: string): ModConfig | undefined {
+  return getModConfigs().find(c => c.modId === modId);
+}
+
+// 添加或更新模组配置关联
+export function addOrUpdateModConfig(config: ModConfig): void {
+  const configs = getModConfigs();
+  const index = configs.findIndex(c => c.modId === config.modId);
+  if (index >= 0) {
+    configs[index] = config;
+  } else {
+    configs.push(config);
+  }
+  saveModConfigs(configs);
+}
+
+// 删除模组配置关联
+export function removeModConfig(modId: string): void {
+  const configs = getModConfigs();
+  saveModConfigs(configs.filter(c => c.modId !== modId));
+}
+
+// 为模组添加配置文件
+export function addModConfigFile(modId: string, modName: string, file: Omit<ModConfigFile, 'linkedAt'>): void {
+  const configs = getModConfigs();
+  const index = configs.findIndex(c => c.modId === modId);
+  
+  const newFile: ModConfigFile = {
+    ...file,
+    linkedAt: new Date().toISOString(),
+  };
+  
+  if (index >= 0) {
+    // 确保 files 数组存在
+    if (!configs[index].files) {
+      configs[index].files = [];
+    }
+    // 检查是否已存在相同路径的文件
+    const existingIndex = configs[index].files.findIndex(f => f.path === file.path);
+    if (existingIndex >= 0) {
+      configs[index].files[existingIndex] = newFile;
+    } else {
+      configs[index].files.push(newFile);
+    }
+  } else {
+    configs.push({
+      modId,
+      modName,
+      files: [newFile],
+      lastScanAt: new Date().toISOString(),
+    });
+  }
+  
+  saveModConfigs(configs);
+}
+
+// 移除模组的配置文件关联
+export function removeModConfigFile(modId: string, filePath: string): void {
+  const configs = getModConfigs();
+  const index = configs.findIndex(c => c.modId === modId);
+  
+  if (index >= 0) {
+    // 确保 files 数组存在
+    if (!configs[index].files) {
+      configs[index].files = [];
+    }
+    configs[index].files = configs[index].files.filter(f => f.path !== filePath);
+    // 如果没有文件了，删除整个配置
+    if (configs[index].files.length === 0) {
+      configs.splice(index, 1);
+    }
+    saveModConfigs(configs);
+  }
 }

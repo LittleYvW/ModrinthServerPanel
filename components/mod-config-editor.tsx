@@ -1,0 +1,965 @@
+'use client';
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Check, 
+  AlertCircle, 
+  Save, 
+  RotateCcw, 
+  FileJson, 
+  FileCode, 
+  FileType,
+  ChevronRight,
+  Type,
+  Hash,
+  ToggleLeft,
+  Braces,
+  Info,
+  Eye,
+  Code,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
+import { 
+  fadeIn, 
+  staggerContainer, 
+  listItem,
+  easings
+} from '@/lib/animations';
+
+// 配置值类型
+interface ConfigValue {
+  key: string;
+  value: unknown;
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
+  description?: string;
+  path: string;
+  depth: number;
+}
+
+// 配置文件编辑器属性
+interface ModConfigEditorProps {
+  modId: string;
+  modName: string;
+  filePath: string;
+  fileType: 'json' | 'json5' | 'toml';
+  onClose?: () => void;
+  onSave?: () => void;
+}
+
+// 文件类型图标
+const FileTypeIcon = ({ type, className }: { type: string; className?: string }) => {
+  switch (type) {
+    case 'json':
+    case 'json5':
+      return <FileJson className={className} />;
+    case 'toml':
+      return <FileCode className={className} />;
+    default:
+      return <FileType className={className} />;
+  }
+};
+
+// 值类型图标
+const ValueTypeIcon = ({ type }: { type: ConfigValue['type'] }) => {
+  switch (type) {
+    case 'string':
+      return <Type className="w-3 h-3" />;
+    case 'number':
+      return <Hash className="w-3 h-3" />;
+    case 'boolean':
+      return <ToggleLeft className="w-3 h-3" />;
+    case 'object':
+    case 'array':
+      return <Braces className="w-3 h-3" />;
+    default:
+      return null;
+  }
+};
+
+// 值类型颜色
+const getTypeColor = (type: ConfigValue['type']) => {
+  switch (type) {
+    case 'string':
+      return 'text-[#00d17a]';
+    case 'number':
+      return 'text-[#1b8fff]';
+    case 'boolean':
+      return 'text-[#9b59b6]';
+    case 'object':
+    case 'array':
+      return 'text-[#e67e22]';
+    default:
+      return 'text-[#707070]';
+  }
+};
+
+// 值类型背景色
+const getTypeBgColor = (type: ConfigValue['type']) => {
+  switch (type) {
+    case 'string':
+      return 'bg-[#00d17a]/10 border-[#00d17a]/20';
+    case 'number':
+      return 'bg-[#1b8fff]/10 border-[#1b8fff]/20';
+    case 'boolean':
+      return 'bg-[#9b59b6]/10 border-[#9b59b6]/20';
+    case 'object':
+    case 'array':
+      return 'bg-[#e67e22]/10 border-[#e67e22]/20';
+    default:
+      return 'bg-[#2a2a2a] border-[#3a3a3a]';
+  }
+};
+
+// 从注释提取描述（简单的启发式方法）
+function extractDescription(content: string, key: string): string | undefined {
+  const lines = content.split('\n');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // 查找包含该键的行
+    if (line.includes(`"${key}"`) || line.includes(`${key}:`) || line.includes(`${key} =`)) {
+      // 向前查找注释
+      const descriptions: string[] = [];
+      for (let j = Math.max(0, i - 5); j < i; j++) {
+        const prevLine = lines[j].trim();
+        // JSON/JSON5 风格的注释
+        if (prevLine.startsWith('//') || prevLine.startsWith('#') || prevLine.startsWith('/*')) {
+          const comment = prevLine
+            .replace(/^\/\//, '')
+            .replace(/^#/, '')
+            .replace(/^\/\*/, '')
+            .replace(/\*\/$/, '')
+            .replace(/^\*\s*/, '')
+            .trim();
+          if (comment && !comment.startsWith('===') && !comment.startsWith('---')) {
+            descriptions.push(comment);
+          }
+        }
+      }
+      if (descriptions.length > 0) {
+        return descriptions.join(' ');
+      }
+    }
+  }
+  
+  return undefined;
+}
+
+// 递归提取所有配置值
+function extractConfigValues(
+  obj: unknown, 
+  content: string,
+  path: string = '', 
+  depth: number = 0
+): ConfigValue[] {
+  const results: ConfigValue[] = [];
+  
+  if (obj === null) {
+    return [{ key: path, value: null, type: 'null', path, depth }];
+  }
+  
+  if (typeof obj === 'object' && !Array.isArray(obj)) {
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      const currentPath = path ? `${path}.${key}` : key;
+      const type = Array.isArray(value) ? 'array' : 
+                   value === null ? 'null' : 
+                   typeof value as ConfigValue['type'];
+      
+      results.push({
+        key,
+        value,
+        type,
+        description: extractDescription(content, key),
+        path: currentPath,
+        depth,
+      });
+      
+      if (typeof value === 'object' && value !== null) {
+        results.push(...extractConfigValues(value, content, currentPath, depth + 1));
+      }
+    }
+  } else if (Array.isArray(obj)) {
+    obj.forEach((item, index) => {
+      const currentPath = `${path}[${index}]`;
+      results.push(...extractConfigValues(item, content, currentPath, depth + 1));
+    });
+  }
+  
+  return results;
+}
+
+// 配置项编辑器
+interface ConfigItemEditorProps {
+  config: ConfigValue;
+  value: unknown;
+  onChange: (path: string, value: unknown) => void;
+  isExpanded: boolean;
+  onToggle: () => void;
+  childConfigs?: ConfigValue[];
+}
+
+const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, childConfigs = [] }: ConfigItemEditorProps) => {
+  const [localValue, setLocalValue] = useState(value);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+  
+  const handleChange = (newValue: unknown) => {
+    setLocalValue(newValue);
+    onChange(config.path, newValue);
+  };
+  
+  const renderEditor = () => {
+    switch (config.type) {
+      case 'boolean':
+        return (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleChange(!localValue)}
+            className={cn(
+              'relative w-12 h-6 rounded-full transition-colors duration-200',
+              localValue ? 'bg-[#00d17a]' : 'bg-[#3a3a3a]'
+            )}
+          >
+            <motion.div
+              className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md"
+              animate={{ 
+                left: localValue ? 'calc(100% - 1.375rem)' : '0.125rem' 
+              }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            />
+          </motion.button>
+        );
+        
+      case 'number':
+        return (
+          <input
+            type="text"
+            inputMode="numeric"
+            value={String(localValue ?? '')}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '' || val === '-') {
+                handleChange(val);
+              } else {
+                const num = Number(val);
+                if (!isNaN(num)) {
+                  handleChange(num);
+                }
+              }
+            }}
+            onFocus={() => setIsEditing(true)}
+            onBlur={() => {
+              setIsEditing(false);
+              // 确保最终保存为数字
+              const num = Number(localValue);
+              if (!isNaN(num) && localValue !== '') {
+                handleChange(num);
+              }
+            }}
+            className={cn(
+              'px-3 py-1.5 rounded-md bg-[#1a1a1a] border text-sm font-mono w-32',
+              'focus:outline-none focus:ring-2 focus:ring-[#00d17a]/50',
+              'transition-all duration-200',
+              isEditing ? 'border-[#00d17a] text-white' : 'border-[#3a3a3a] text-[#1b8fff]'
+            )}
+          />
+        );
+        
+      case 'string':
+        return (
+          <input
+            type="text"
+            value={String(localValue ?? '')}
+            onChange={(e) => handleChange(e.target.value)}
+            onFocus={() => setIsEditing(true)}
+            onBlur={() => setIsEditing(false)}
+            className={cn(
+              'px-3 py-1.5 rounded-md bg-[#1a1a1a] border text-sm flex-1 min-w-0',
+              'focus:outline-none focus:ring-2 focus:ring-[#00d17a]/50',
+              'transition-all duration-200',
+              isEditing ? 'border-[#00d17a] text-white' : 'border-[#3a3a3a] text-[#00d17a]'
+            )}
+          />
+        );
+        
+      default:
+        return (
+          <span className="text-[#707070] text-sm italic">
+            {Array.isArray(localValue) ? `[${(localValue as unknown[]).length} items]` : 
+             typeof localValue === 'object' ? '{...}' : 
+             String(localValue)}
+          </span>
+        );
+    }
+  };
+  
+  const hasChildren = config.type === 'object' || config.type === 'array';
+  
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.2, ease: easings.spring }}
+      className={cn(
+        'group rounded-lg border transition-all duration-200',
+        'hover:border-[#4a4a4a] hover:shadow-lg hover:shadow-black/20',
+        getTypeBgColor(config.type)
+      )}
+      style={{ marginLeft: `${config.depth * 16}px` }}
+    >
+      <div className="p-3">
+        <div className="flex items-start gap-3">
+          {/* 展开/折叠按钮（仅对象/数组） */}
+          {hasChildren ? (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={onToggle}
+              className="mt-0.5 p-0.5 rounded hover:bg-white/10 text-[#707070] hover:text-white transition-colors"
+            >
+              <motion.div
+                animate={{ rotate: isExpanded ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </motion.div>
+            </motion.button>
+          ) : (
+            <div className="w-5" />
+          )}
+          
+          {/* 类型图标 */}
+          <div className={cn('mt-0.5', getTypeColor(config.type))}>
+            <ValueTypeIcon type={config.type} />
+          </div>
+          
+          {/* 键名 */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={cn(
+                'font-medium text-sm',
+                config.depth === 0 ? 'text-white' : 'text-[#a0a0a0]'
+              )}>
+                {config.key}
+              </span>
+              
+              {/* 类型标签 */}
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  'text-[10px] px-1.5 py-0 h-4 border-0',
+                  getTypeBgColor(config.type),
+                  getTypeColor(config.type)
+                )}
+              >
+                {config.type}
+              </Badge>
+            </div>
+            
+            {/* 描述 */}
+            {config.description && (
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-xs text-[#707070] mt-1 leading-relaxed"
+              >
+                <Info className="w-3 h-3 inline mr-1 opacity-50" />
+                {config.description}
+              </motion.p>
+            )}
+          </div>
+          
+          {/* 值编辑器 */}
+          <div className="flex-shrink-0">
+            {renderEditor()}
+          </div>
+        </div>
+      </div>
+      
+      {/* 子配置项（仅 object/array 且展开时显示） */}
+      <AnimatePresence>
+        {hasChildren && isExpanded && childConfigs.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: easings.standard }}
+            className="overflow-hidden"
+          >
+            <div className="pt-2 pb-1 space-y-2">
+              {childConfigs.map((childConfig) => (
+                <ConfigItemEditor
+                  key={childConfig.path}
+                  config={childConfig}
+                  value={childConfig.value}
+                  onChange={onChange}
+                  isExpanded={false}
+                  onToggle={() => {}}
+                  childConfigs={[]}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+// 代码预览模式 - 使用 Prism 风格但不显示颜色代码
+interface CodePreviewProps {
+  content: string;
+  type: 'json' | 'json5' | 'toml';
+}
+
+const CodePreview = ({ content, type }: CodePreviewProps) => {
+  // 将内容分割成 token 进行高亮
+  const renderHighlighted = () => {
+    if (!content) return null;
+    
+    const lines = content.split('\n');
+    
+    return lines.map((line, lineIdx) => {
+      const tokens: React.ReactNode[] = [];
+      let remaining = line;
+      let keyCounter = 0;
+      
+      // 首先转义 HTML 特殊字符
+      const escapeHtml = (str: string) => str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      
+      // TOML section header [section]
+      if (type === 'toml') {
+        const sectionMatch = remaining.match(/^(\s*)(\[)([^\]]+)(\])(\s*)$/);
+        if (sectionMatch) {
+          tokens.push(
+            <span key={keyCounter++}>{escapeHtml(sectionMatch[1])}</span>,
+            <span key={keyCounter++} className="text-[#e67e22]">{escapeHtml(sectionMatch[2] + sectionMatch[3] + sectionMatch[4])}</span>,
+            <span key={keyCounter++}>{escapeHtml(sectionMatch[5])}</span>
+          );
+          remaining = '';
+        }
+      }
+      
+      // 逐行解析
+      while (remaining.length > 0) {
+        let matched = false;
+        
+        // 1. 字符串（双引号）- JSON/JSON5/TOML
+        const strMatch = remaining.match(/^([^"]*)"([^"]*)"(.*)$/);
+        if (strMatch) {
+          if (strMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(strMatch[1])}</span>);
+          tokens.push(<span key={keyCounter++} className="text-[#00d17a]">{escapeHtml('"' + strMatch[2] + '"')}</span>);
+          remaining = strMatch[3];
+          matched = true;
+          continue;
+        }
+        
+        // 2. 字符串（单引号）- JSON5/TOML
+        const strSingleMatch = remaining.match(/^([^']*)'([^']*)'(.*)$/);
+        if (strSingleMatch) {
+          if (strSingleMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(strSingleMatch[1])}</span>);
+          tokens.push(<span key={keyCounter++} className="text-[#00d17a]">{escapeHtml("'" + strSingleMatch[2] + "'")}</span>);
+          remaining = strSingleMatch[3];
+          matched = true;
+          continue;
+        }
+        
+        // 3. 数字
+        const numMatch = remaining.match(/^([^0-9\-]*)(-?\d+\.?\d*)(.*)$/);
+        if (numMatch && numMatch[2] && !isNaN(Number(numMatch[2]))) {
+          // 检查是否是键名的一部分（后面跟着 = 或 :）
+          const nextChar = numMatch[3].charAt(0);
+          if (nextChar !== '=' && nextChar !== ':') {
+            if (numMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(numMatch[1])}</span>);
+            tokens.push(<span key={keyCounter++} className="text-[#1b8fff]">{escapeHtml(numMatch[2])}</span>);
+            remaining = numMatch[3];
+            matched = true;
+            continue;
+          }
+        }
+        
+        // 4. 布尔值
+        const boolMatch = remaining.match(/^(.*?)(\b(?:true|false)\b)(.*)$/i);
+        if (boolMatch) {
+          if (boolMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(boolMatch[1])}</span>);
+          tokens.push(<span key={keyCounter++} className="text-[#9b59b6]">{escapeHtml(boolMatch[2])}</span>);
+          remaining = boolMatch[3];
+          matched = true;
+          continue;
+        }
+        
+        // 5. null
+        const nullMatch = remaining.match(/^(.*?)(\bnull\b)(.*)$/);
+        if (nullMatch) {
+          if (nullMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(nullMatch[1])}</span>);
+          tokens.push(<span key={keyCounter++} className="text-[#707070]">{escapeHtml(nullMatch[2])}</span>);
+          remaining = nullMatch[3];
+          matched = true;
+          continue;
+        }
+        
+        // 6. 注释（TOML/JSON5）
+        if (type === 'toml' || type === 'json5') {
+          const commentMatch = remaining.match(/^(.*?)(#|\/\/)(.*)$/);
+          if (commentMatch) {
+            if (commentMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(commentMatch[1])}</span>);
+            tokens.push(<span key={keyCounter++} className="text-[#707070] italic">{escapeHtml(commentMatch[2] + commentMatch[3])}</span>);
+            remaining = '';
+            matched = true;
+            continue;
+          }
+        }
+        
+        // 没有匹配到任何 token，直接添加剩余部分
+        if (!matched) {
+          tokens.push(<span key={keyCounter++}>{escapeHtml(remaining)}</span>);
+          remaining = '';
+        }
+      }
+      
+      return <div key={lineIdx}>{tokens}</div>;
+    });
+  };
+  
+  return (
+    <pre className="font-mono text-sm leading-relaxed p-4 overflow-auto whitespace-pre-wrap break-all text-[#a0a0a0]">
+      <code>{renderHighlighted()}</code>
+    </pre>
+  );
+};
+
+// 主编辑器组件
+export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, onSave }: ModConfigEditorProps) {
+  const [content, setContent] = useState<string>('');
+  const [parsed, setParsed] = useState<unknown>(null);
+  const [originalContent, setOriginalContent] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'form' | 'code'>('form');
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [hasChanges, setHasChanges] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // 加载文件内容
+  useEffect(() => {
+    loadFile();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modId, filePath]);
+  
+  const loadFile = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const res = await fetch(`/api/mod-configs/file?path=${encodeURIComponent(filePath)}`);
+      const data = await res.json();
+      
+      if (data.success) {
+        setContent(data.content);
+        setOriginalContent(data.content);
+        setParsed(data.parsed);
+        
+        // 默认展开所有
+        if (data.parsed && typeof data.parsed === 'object') {
+          const allPaths = new Set<string>();
+          const collectPaths = (obj: unknown, path: string = '') => {
+            if (typeof obj === 'object' && obj !== null) {
+              allPaths.add(path);
+              for (const key of Object.keys(obj)) {
+                collectPaths((obj as Record<string, unknown>)[key], path ? `${path}.${key}` : key);
+              }
+            }
+          };
+          collectPaths(data.parsed);
+          setExpandedPaths(allPaths);
+        }
+      } else {
+        setError(data.error || 'Failed to load file');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // 提取配置项
+  const configValues = useMemo(() => {
+    if (!parsed) return [];
+    return extractConfigValues(parsed, content);
+  }, [parsed, content]);
+  
+  // 过滤出顶层配置项
+  const topLevelConfigs = useMemo(() => {
+    return configValues.filter(c => c.depth === 0);
+  }, [configValues]);
+  
+  // 处理值变更
+  const handleValueChange = useCallback((path: string, newValue: unknown) => {
+    setParsed((prev: unknown) => {
+      const newParsed = JSON.parse(JSON.stringify(prev));
+      const keys = path.split('.');
+      let current: Record<string, unknown> = newParsed as Record<string, unknown>;
+      
+      for (let i = 0; i < keys.length - 1; i++) {
+        current = current[keys[i]] as Record<string, unknown>;
+      }
+      
+      current[keys[keys.length - 1]] = newValue;
+      return newParsed;
+    });
+    
+    setHasChanges(true);
+    setSaveSuccess(false);
+  }, []);
+  
+  // 切换展开状态
+  const toggleExpanded = useCallback((path: string) => {
+    setExpandedPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
+  
+  // 保存文件
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    
+    try {
+      // 根据类型生成内容
+      let finalContent = content;
+      if (viewMode === 'form' && parsed) {
+        if (fileType === 'json') {
+          finalContent = JSON.stringify(parsed, null, 2);
+        } else if (fileType === 'json5') {
+          // JSON5 尝试保留注释（简化处理：使用原始内容）
+          finalContent = JSON.stringify(parsed, null, 2);
+        } else if (fileType === 'toml') {
+          // TOML 需要重新序列化
+          const { default: TOML } = await import('@iarna/toml');
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          finalContent = TOML.stringify(parsed as any);
+        }
+      }
+      
+      const res = await fetch('/api/mod-configs/file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: filePath,
+          content: finalContent,
+          format: fileType,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setOriginalContent(finalContent);
+        setHasChanges(false);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+        onSave?.();
+      } else {
+        setError(data.error || 'Failed to save file');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSaving(false);
+    }
+  };
+  
+  // 重置更改
+  const handleReset = async () => {
+    setContent(originalContent);
+    // 根据文件类型解析原始内容
+    try {
+      if (fileType === 'toml') {
+        const { default: TOML } = await import('@iarna/toml');
+        setParsed(TOML.parse(originalContent));
+      } else if (fileType === 'json5') {
+        const JSON5 = await import('json5');
+        setParsed(JSON5.parse(originalContent));
+      } else {
+        setParsed(JSON.parse(originalContent));
+      }
+    } catch (e) {
+      // 如果解析失败，保持当前 parsed 值
+      console.error('Failed to parse original content:', e);
+    }
+    setHasChanges(false);
+  };
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+        >
+          <FileCode className="w-8 h-8 text-[#00d17a]" />
+        </motion.div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="flex flex-col items-center justify-center h-64 text-center p-6"
+      >
+        <AlertCircle className="w-12 h-12 text-[#e74c3c] mb-4" />
+        <h3 className="text-lg font-medium text-white mb-2">加载失败</h3>
+        <p className="text-sm text-[#707070]">{error}</p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadFile}
+          className="mt-4 border-[#3a3a3a] text-[#a0a0a0] hover:text-white"
+        >
+          <RotateCcw className="w-4 h-4 mr-2" />
+          重试
+        </Button>
+      </motion.div>
+    );
+  }
+  
+  return (
+    <TooltipProvider>
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={fadeIn}
+        className="flex flex-col h-full"
+      >
+        {/* 工具栏 */}
+        <div className="flex items-center justify-between p-4 border-b border-[#2a2a2a] bg-[#151515]/50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[#00d17a]/10">
+              <FileTypeIcon type={fileType} className="w-5 h-5 text-[#00d17a]" />
+            </div>
+            <div>
+              <h3 className="font-medium text-white text-sm">{filePath}</h3>
+              <p className="text-xs text-[#707070]">{modName}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* 视图切换 */}
+            <div className="flex bg-[#1a1a1a] rounded-lg p-0.5 border border-[#2a2a2a]">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewMode('form')}
+                    className={cn(
+                      'h-7 px-2 text-xs',
+                      viewMode === 'form' 
+                        ? 'bg-[#262626] text-white' 
+                        : 'text-[#707070] hover:text-white'
+                    )}
+                  >
+                    <Eye className="w-3.5 h-3.5 mr-1" />
+                    表单
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>可视化编辑模式</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewMode('code')}
+                    className={cn(
+                      'h-7 px-2 text-xs',
+                      viewMode === 'code' 
+                        ? 'bg-[#262626] text-white' 
+                        : 'text-[#707070] hover:text-white'
+                    )}
+                  >
+                    <Code className="w-3.5 h-3.5 mr-1" />
+                    代码
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>源代码编辑模式</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            
+            {/* 保存状态指示 */}
+            <AnimatePresence mode="wait">
+              {saveSuccess ? (
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00d17a]/10 text-[#00d17a]"
+                >
+                  <Check className="w-4 h-4" />
+                  <span className="text-xs font-medium">已保存</span>
+                </motion.div>
+              ) : hasChanges ? (
+                <motion.div
+                  key="unsaved"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#e67e22]/10 text-[#e67e22]"
+                >
+                  <div className="w-2 h-2 rounded-full bg-[#e67e22] animate-pulse" />
+                  <span className="text-xs font-medium">未保存</span>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+            
+            {/* 操作按钮 */}
+            {hasChanges && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleReset}
+                    className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a]"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>重置更改</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={saving || !hasChanges}
+                  className={cn(
+                    'h-8 px-3 bg-[#00d17a] hover:bg-[#00b86b] text-black font-medium',
+                    'disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
+                >
+                  {saving ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                    >
+                      <Save className="w-4 h-4" />
+                    </motion.div>
+                  ) : (
+                    <Save className="w-4 h-4 mr-1.5" />
+                  )}
+                  保存
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>保存配置文件</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+        
+        {/* 编辑器内容 */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <AnimatePresence mode="wait" initial={false}>
+            {viewMode === 'form' ? (
+              <motion.div
+                key="form"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+                className="h-full overflow-hidden"
+              >
+                <ScrollArea className="h-full w-full" type="always">
+                  <div className="p-4 space-y-3 min-h-0">
+                    {topLevelConfigs.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <FileCode className="w-12 h-12 text-[#3a3a3a] mb-4" />
+                        <p className="text-[#707070]">配置文件为空或无法解析</p>
+                      </div>
+                    ) : (
+                      <motion.div
+                        variants={staggerContainer}
+                        initial="hidden"
+                        animate="visible"
+                        className="space-y-3"
+                      >
+                        {topLevelConfigs.map((config) => {
+                          // 获取该配置项的直接子配置项
+                          const childConfigs = configValues.filter(
+                            c => c.path.startsWith(config.path + '.') && c.depth === config.depth + 1
+                          );
+                          return (
+                            <motion.div key={config.path} variants={listItem}>
+                              <ConfigItemEditor
+                                config={config}
+                                value={config.value}
+                                onChange={handleValueChange}
+                                isExpanded={expandedPaths.has(config.path)}
+                                onToggle={() => toggleExpanded(config.path)}
+                                childConfigs={childConfigs}
+                              />
+                            </motion.div>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="code"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="h-full overflow-hidden bg-[#0d0d0d]"
+              >
+                <ScrollArea className="h-full w-full" type="always">
+                  <CodePreview content={content} type={fileType} />
+                </ScrollArea>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </TooltipProvider>
+  );
+}
+
+export default ModConfigEditor;

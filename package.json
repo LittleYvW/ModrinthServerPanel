@@ -9,11 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@iarna/toml": "^2.2.5",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "axios": "^1.13.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.0",
+    "json5": "^2.2.3",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "radix-ui": "^1.4.3",

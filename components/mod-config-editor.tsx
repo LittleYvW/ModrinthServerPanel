@@ -1021,14 +1021,14 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
   }, [lines.length]);
   
   // 渲染 token
+  // 注意：React 会自动转义 HTML 特殊字符，所以不需要手动调用 escapeHtml
   const renderToken = (token: Token, index: number): React.ReactNode => {
     const className = getTokenClassName(token.type);
-    const escaped = escapeHtml(token.value);
     
     // 将空格转换为不可见空格字符以保持缩进
     const displayValue = token.type === 'whitespace' 
-      ? escaped.replace(/ /g, '\u00A0').replace(/\t/g, '\u00A0\u00A0')
-      : escaped;
+      ? token.value.replace(/ /g, '\u00A0').replace(/\t/g, '\u00A0\u00A0')
+      : token.value;
     
     return (
       <span 

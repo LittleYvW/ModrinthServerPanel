@@ -8,11 +8,9 @@ import {
   FileCode,
   FileType,
   Plus,
-  Trash2,
   RefreshCw,
   Search,
   FolderOpen,
-  X,
   Check,
   AlertCircle,
   ChevronRight,
@@ -109,6 +107,8 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
   const [activeTab, setActiveTab] = useState('linked');
   const [, setError] = useState<string | null>(null);
   const [scanResults, setScanResults] = useState<Array<{ modId: string; modName: string; files: Array<{ path: string; type: string }> }> | null>(null);
+  const [showScanResults, setShowScanResults] = useState(false);
+  const [scanAnimationKey, setScanAnimationKey] = useState(0);
   
   // 加载已关联的文件
   const loadLinkedFiles = useCallback(async () => {
@@ -155,6 +155,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
     setScanning(true);
     setError(null);
     setScanResults(null);
+    setShowScanResults(false);
     
     try {
       const res = await fetch('/api/mod-configs/scan', { method: 'POST' });
@@ -171,6 +172,17 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
         
         // 重新加载关联文件
         await loadLinkedFiles();
+        
+        // 显示扫描结果提示
+        setShowScanResults(true);
+        
+        // 触发扫描动画
+        setScanAnimationKey(prev => prev + 1);
+        
+        // 3秒后自动隐藏扫描结果提示
+        setTimeout(() => {
+          setShowScanResults(false);
+        }, 3000);
         
         // 显示结果后切换回关联标签
         setTimeout(() => {
@@ -332,20 +344,40 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
                     size="sm"
                     onClick={handleScan}
                     disabled={scanning}
-                    className="border-[#2a2a2a] text-[#a0a0a0] hover:text-[#00d17a] hover:border-[#00d17a]/50"
+                    className={cn(
+                      "border-[#2a2a2a] text-[#a0a0a0] hover:text-[#00d17a] hover:border-[#00d17a]/50 relative overflow-hidden",
+                      scanning && "border-[#00d17a]/30 text-[#00d17a]"
+                    )}
                   >
                     {scanning ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                        className="mr-2"
-                      >
-                        <Loader2 className="w-4 h-4" />
-                      </motion.div>
+                      <>
+                        {/* 扫描动画效果 */}
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-[#00d17a]/10 to-transparent"
+                          animate={{
+                            x: ['-100%', '100%'],
+                          }}
+                          transition={{
+                            duration: 1.5,
+                            ease: 'linear',
+                            repeat: Infinity,
+                          }}
+                        />
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                          className="mr-2 relative z-10"
+                        >
+                          <Loader2 className="w-4 h-4" />
+                        </motion.div>
+                        <span className="relative z-10">扫描中...</span>
+                      </>
                     ) : (
-                      <Sparkles className="w-4 h-4 mr-2" />
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        自动扫描
+                      </>
                     )}
-                    自动扫描
                   </Button>
                 </div>
               </div>
@@ -364,28 +396,45 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
             
             {/* 扫描结果提示 */}
             <AnimatePresence>
-              {scanResults && (
+              {showScanResults && scanResults && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
+                  initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                  transition={{ 
+                    duration: 0.3, 
+                    ease: [0.4, 0, 0.2, 1],
+                    exit: { duration: 0.2 }
+                  }}
                   className="px-6"
                 >
                   <div className={cn(
-                    'flex items-center gap-2 px-4 py-3 rounded-lg',
+                    'flex items-center gap-3 px-4 py-3 rounded-lg border',
                     scanResults.length > 0 
-                      ? 'bg-[#00d17a]/10 text-[#00d17a]' 
-                      : 'bg-[#707070]/10 text-[#a0a0a0]'
+                      ? 'bg-[#00d17a]/10 text-[#00d17a] border-[#00d17a]/20' 
+                      : 'bg-[#707070]/10 text-[#a0a0a0] border-[#707070]/20'
                   )}>
                     {scanResults.length > 0 ? (
                       <>
-                        <Check className="w-5 h-5" />
-                        <span>扫描完成！找到 {scanResults[0]?.files?.length || 0} 个相关配置文件</span>
+                        <motion.div
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 15, delay: 0.1 }}
+                        >
+                          <Check className="w-5 h-5" />
+                        </motion.div>
+                        <span className="font-medium">扫描完成！找到 {scanResults[0]?.files?.length || 0} 个相关配置文件</span>
                       </>
                     ) : (
                       <>
-                        <AlertCircle className="w-5 h-5" />
-                        <span>未找到相关配置文件</span>
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 15, delay: 0.1 }}
+                        >
+                          <AlertCircle className="w-5 h-5" />
+                        </motion.div>
+                        <span className="font-medium">未找到相关配置文件</span>
                       </>
                     )}
                   </div>
@@ -455,18 +504,27 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
                       </Button>
                     </motion.div>
                   ) : (
-                    <motion.div
-                      variants={staggerContainer}
-                      initial="hidden"
-                      animate="visible"
+                    <div
+                      key={scanAnimationKey}
                       className="space-y-2 pt-4"
                     >
-                      {filteredLinkedFiles.map((file) => (
+                      {filteredLinkedFiles.map((file, index) => (
                         <motion.div
                           key={file.path}
-                          variants={listItem}
-                          layout
-                          className="group flex items-center gap-3 p-3 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors"
+                          initial={{ opacity: 0, x: -60 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{
+                            type: 'spring',
+                            stiffness: 300,
+                            damping: 24,
+                            delay: index * 0.05,
+                          }}
+                          className={cn(
+                            "group flex items-center gap-3 p-3 rounded-lg border transition-all duration-300",
+                            file.autoDetected 
+                              ? "bg-[#00d17a]/5 border-[#00d17a]/20 hover:border-[#00d17a]/40 hover:bg-[#00d17a]/10" 
+                              : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#3a3a3a]"
+                          )}
                         >
                           <div className={cn(
                             'p-2 rounded-lg',
@@ -512,7 +570,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
                           </div>
                         </motion.div>
                       ))}
-                    </motion.div>
+                    </div>
                   )}
                   </div>
                 </ScrollArea>

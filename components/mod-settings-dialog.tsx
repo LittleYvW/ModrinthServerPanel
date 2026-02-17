@@ -257,7 +257,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
             className="h-full flex flex-col"
           >
             {/* 编辑器头部 - 使用 sr-only 标题满足可访问性要求 */}
@@ -305,6 +305,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
             className="h-full flex flex-col"
           >
             {/* 头部 */}
@@ -442,7 +443,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
                         暂无关联的配置文件
                       </h3>
                       <p className="text-sm text-[#707070] max-w-sm mb-6">
-                        点击"自动扫描"查找相关配置文件，或切换到"可用文件"标签手动添加
+                        点击&quot;自动扫描&quot;查找相关配置文件，或切换到&quot;可用文件&quot;标签手动添加
                       </p>
                       <Button
                         variant="outline"

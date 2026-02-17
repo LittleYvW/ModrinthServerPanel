@@ -26,8 +26,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils';
 import { 
   fadeIn, 
-  staggerContainer, 
-  listItem,
   easings
 } from '@/lib/animations';
 
@@ -321,12 +319,7 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
     const descriptionLines = config.description ? config.description.split('\n') : [];
     
     return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -4 }}
-        transition={{ duration: 0.15 }}
+      <div
         className="group"
         style={{ marginLeft: `${config.depth * 12}px` }}
       >
@@ -404,7 +397,7 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2, ease: easings.standard }}
+                transition={{ duration: 0.25, ease: easings.standard }}
                 className="overflow-hidden"
               >
                 {/* 子项容器 - 带左边框表示层级 */}
@@ -427,7 +420,7 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
             )}
           </AnimatePresence>
         </div>
-      </motion.div>
+      </div>
     );
   }
   
@@ -436,12 +429,7 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
   const descriptionLines = config.description ? config.description.split('\n') : [];
   
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      transition={{ duration: 0.15 }}
+    <div
       className="group"
       style={{ marginLeft: `${config.depth * 12}px` }}
     >
@@ -502,7 +490,7 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -1025,69 +1013,88 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         </div>
         
         {/* 编辑器内容 */}
+        {/* 编辑器内容 */}
         <div className="flex-1 min-h-0 overflow-hidden relative">
-          <AnimatePresence mode="wait" initial={false}>
-            {viewMode === 'form' ? (
-              <motion.div
-                key="form"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.2 }}
-                className="h-full overflow-hidden absolute inset-0"
-              >
-                <ScrollArea className="h-full w-full" type="always">
-                  <div className="p-4 space-y-1">
-                    {topLevelConfigs.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <FileCode className="w-12 h-12 text-[#3a3a3a] mb-4" />
-                        <p className="text-[#707070]">配置文件为空或无法解析</p>
-                      </div>
-                    ) : (
-                      <motion.div
-                        variants={staggerContainer}
-                        initial="hidden"
-                        animate="visible"
-                        className="space-y-1"
-                      >
-                        {topLevelConfigs.map((config) => {
-                          // 获取该配置项的直接子配置项
-                          const childConfigs = configValues.filter(
-                            c => c.path.startsWith(config.path + '.') && c.depth === config.depth + 1
-                          );
-                          return (
-                            <motion.div key={config.path} variants={listItem}>
-                              <ConfigItemEditor
-                                config={config}
-                                value={config.value}
-                                onChange={handleValueChange}
-                                isExpanded={expandedPaths.has(config.path)}
-                                onToggle={() => toggleExpanded(config.path)}
-                                childConfigs={childConfigs}
-                              />
-                            </motion.div>
-                          );
-                        })}
-                      </motion.div>
-                    )}
-                  </div>
-                </ScrollArea>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="code"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="h-full overflow-hidden bg-[#0d0d0d] absolute inset-0"
-              >
-                <ScrollArea className="h-full w-full" type="always">
-                  <CodePreview content={content} type={fileType} />
-                </ScrollArea>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {viewMode === 'form' ? (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15 }}
+              className="h-full overflow-hidden absolute inset-0"
+            >
+              <ScrollArea className="h-full w-full" type="always">
+                <div className="p-4 space-y-1">
+                  {topLevelConfigs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <FileCode className="w-12 h-12 text-[#3a3a3a] mb-4" />
+                      <p className="text-[#707070]">配置文件为空或无法解析</p>
+                    </div>
+                  ) : (
+                    <motion.div
+                      variants={{
+                        hidden: { opacity: 0 },
+                        visible: {
+                          opacity: 1,
+                          transition: {
+                            staggerChildren: 0.05,
+                            delayChildren: 0.05,
+                          },
+                        },
+                      }}
+                      initial="hidden"
+                      animate="visible"
+                      className="space-y-1"
+                    >
+                      {topLevelConfigs.map((config) => {
+                        // 获取该配置项的直接子配置项
+                        const childConfigs = configValues.filter(
+                          c => c.path.startsWith(config.path + '.') && c.depth === config.depth + 1
+                        );
+                        return (
+                          <motion.div 
+                            key={config.path} 
+                            variants={{
+                              hidden: { opacity: 0, y: 16 },
+                              visible: { 
+                                opacity: 1, 
+                                y: 0,
+                                transition: { 
+                                  duration: 0.3, 
+                                  ease: [0.25, 0.1, 0.25, 1] 
+                                }
+                              },
+                            }}
+                          >
+                            <ConfigItemEditor
+                              config={config}
+                              value={config.value}
+                              onChange={handleValueChange}
+                              isExpanded={expandedPaths.has(config.path)}
+                              onToggle={() => toggleExpanded(config.path)}
+                              childConfigs={childConfigs}
+                            />
+                          </motion.div>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </div>
+              </ScrollArea>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="code"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15 }}
+              className="h-full overflow-hidden bg-[#0d0d0d] absolute inset-0"
+            >
+              <ScrollArea className="h-full w-full" type="always">
+                <CodePreview content={content} type={fileType} />
+              </ScrollArea>
+            </motion.div>
+          )}
         </div>
       </motion.div>
   );

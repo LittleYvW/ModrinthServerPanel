@@ -826,6 +826,55 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   const [hasChanges, setHasChanges] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   
+  // 深度比较两个值是否相等
+  const isDeepEqual = useCallback((a: unknown, b: unknown): boolean => {
+    if (a === b) return true;
+    if (typeof a !== typeof b) return false;
+    if (typeof a !== 'object' || a === null || b === null) return false;
+    
+    const objA = a as Record<string, unknown>;
+    const objB = b as Record<string, unknown>;
+    const keysA = Object.keys(objA);
+    const keysB = Object.keys(objB);
+    
+    if (keysA.length !== keysB.length) return false;
+    
+    for (const key of keysA) {
+      if (!keysB.includes(key)) return false;
+      if (!isDeepEqual(objA[key], objB[key])) return false;
+    }
+    return true;
+  }, []);
+  
+  // 监听 parsed 变化，与原始内容比较以确定是否有更改
+  useEffect(() => {
+    if (!parsed || !originalContent) {
+      setHasChanges(false);
+      return;
+    }
+    
+    try {
+      let originalParsed: unknown;
+      if (fileType === 'toml') {
+        const { parse: parseTOML } = require('@iarna/toml');
+        originalParsed = parseTOML(originalContent);
+      } else if (fileType === 'json5') {
+        const JSON5 = require('json5');
+        originalParsed = JSON5.parse(originalContent);
+      } else {
+        originalParsed = JSON.parse(originalContent);
+      }
+      
+      const changed = !isDeepEqual(parsed, originalParsed);
+      setHasChanges(changed);
+      if (!changed) {
+        setSaveSuccess(false);
+      }
+    } catch {
+      // 解析失败时保持当前状态
+    }
+  }, [parsed, originalContent, fileType, isDeepEqual]);
+  
   // 加载文件内容
   useEffect(() => {
     loadFile();
@@ -881,9 +930,6 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
       current[keys[keys.length - 1]] = newValue;
       return newParsed;
     });
-    
-    setHasChanges(true);
-    setSaveSuccess(false);
   }, []);
   
   // 切换展开状态
@@ -1128,51 +1174,59 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
               </Tooltip>
             </div>
             
-            {/* 保存状态指示 */}
+            {/* 保存状态指示 - 已保存 */}
             <AnimatePresence mode="wait">
-              {saveSuccess ? (
+              {saveSuccess && (
                 <motion.div
                   key="success"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500"
+                  initial={{ opacity: 0, scale: 0.8, x: 10 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, x: 10 }}
+                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 flex-shrink-0"
                 >
                   <Check className="w-4 h-4" />
-                  <span className="text-xs font-medium">已保存</span>
+                  <span className="text-xs font-medium whitespace-nowrap">已保存</span>
                 </motion.div>
-              ) : hasChanges ? (
-                <motion.div
-                  key="unsaved"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500"
-                >
-                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  <span className="text-xs font-medium">未保存</span>
-                </motion.div>
-              ) : null}
+              )}
             </AnimatePresence>
             
-            {/* 操作按钮 */}
-            {hasChanges && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleReset}
-                    className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a]"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>重置更改</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
+            {/* 未保存状态与重置按钮容器 - 统一动画 */}
+            <AnimatePresence>
+              {hasChanges && !saveSuccess && (
+                <motion.div
+                  key="unsaved-group"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                  className="flex items-center gap-2"
+                >
+                  {/* 未保存指示 */}
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0">
+                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="text-xs font-medium whitespace-nowrap">未保存</span>
+                  </div>
+                  
+                  {/* 重置按钮 */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleReset}
+                        className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a] flex-shrink-0"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>重置更改</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </motion.div>
+              )}
+            </AnimatePresence>
             
             <Tooltip>
               <TooltipTrigger asChild>

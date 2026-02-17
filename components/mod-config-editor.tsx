@@ -113,58 +113,160 @@ const getTypeBgColor = (type: ConfigValue['type']) => {
   }
 };
 
-// 从注释提取描述（保留换行格式）
-function extractDescription(content: string, key: string): string | undefined {
+// 检测行是否为键定义行，返回键名和缩进层级
+function parseKeyLine(line: string): { key: string; indent: number; isSection: boolean } | null {
+  const indent = line.length - line.trimStart().length;
+  const trimmed = line.trim();
+  
+  // TOML section: [key] 或 [[key]]
+  const sectionMatch = trimmed.match(/^\[\[?\s*([^\]]+)\s*\]\]?$/);
+  if (sectionMatch) {
+    return { key: sectionMatch[1].trim(), indent, isSection: true };
+  }
+  
+  // JSON: "key": 或 "key" :
+  const jsonMatch = trimmed.match(/^"([^"]+)"\s*:/);
+  if (jsonMatch) {
+    return { key: jsonMatch[1], indent, isSection: false };
+  }
+  
+  // JSON5/TOML: 'key': 或 key: 或 key =
+  const json5Match = trimmed.match(/^'([^']+)'\s*[:=]/);
+  if (json5Match) {
+    return { key: json5Match[1], indent, isSection: false };
+  }
+  
+  // Bare key (JSON5/TOML): key: 或 key = (但排除 true/false/null/数字)
+  const bareMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*[:=]/);
+  if (bareMatch) {
+    const key = bareMatch[1];
+    // 排除关键字和数字
+    if (!/^(true|false|null|undefined)$/.test(key)) {
+      return { key, indent, isSection: false };
+    }
+  }
+  
+  return null;
+}
+
+// 检测行是否为注释行
+function parseCommentLine(line: string): string | null {
+  const trimmed = line.trim();
+  if (trimmed.startsWith('//') || trimmed.startsWith('#')) {
+    return trimmed.slice(trimmed.startsWith('//') ? 2 : 1).trim();
+  }
+  if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+    return trimmed
+      .replace(/^\/\*/, '')
+      .replace(/^\*\s*/, '')
+      .replace(/\*\/$/, '')
+      .trim();
+  }
+  return null;
+}
+
+// 从注释提取描述（支持层级感知）
+function extractDescription(
+  content: string, 
+  key: string, 
+  parentPath: string = ''
+): string | undefined {
   const lines = content.split('\n');
   
-  // 构建精确匹配模式
-  // 支持格式：
-  // - JSON: "key": 或 "key" :
-  // - JSON5: 'key': 或 key: 或 'key' : 或 key :
-  // - TOML: key = 或 [key] 或 [[key]]
-  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const keyPattern = new RegExp(
-    `^\\s*(?:` +
-    `(?:"${escapedKey}")` +              // "key"
-    `|(?:'${escapedKey}')` +              // 'key'
-    `|(?:${escapedKey})` +                // key (bare key)
-    `)\\s*[:=]|` +                        // 后跟 : 或 =
-    `^\\s*\\[\\[?\\s*${escapedKey}\\s*\\]\\]?`  // [key] 或 [[key]]
-  );
+  // 构建目标路径
+  const targetPath = parentPath ? `${parentPath}.${key}` : key;
+  const targetKeys = targetPath.split('.');
+  
+  // 跟踪当前解析的层级结构
+  const pathStack: { key: string; indent: number; lineIndex: number }[] = [];
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const parsed = parseKeyLine(line);
     
-    // 使用正则表达式精确匹配键定义行
-    if (keyPattern.test(line)) {
-      // 向前查找注释（保留原始格式）
-      const descriptionLines: string[] = [];
-      for (let j = Math.max(0, i - 15); j < i; j++) {
-        const prevLine = lines[j];
-        const trimmedLine = prevLine.trim();
-        // JSON/JSON5/TOML 风格的注释
-        if (trimmedLine.startsWith('//') || trimmedLine.startsWith('#') || trimmedLine.startsWith('/*') || trimmedLine.startsWith('*')) {
-          const comment = trimmedLine
-            .replace(/^\/\//, '')
-            .replace(/^#/, '')
-            .replace(/^\/\*/, '')
-            .replace(/\*\/$/, '')
-            .replace(/^\*\s*/, '')
-            .trim();
-          if (comment && !comment.startsWith('===') && !comment.startsWith('---')) {
-            descriptionLines.push(comment);
-          }
-        } else if (trimmedLine === '' && descriptionLines.length > 0) {
-          // 空行表示注释块结束
-          break;
-        }
-      }
-      if (descriptionLines.length > 0) {
-        // 保留换行
-        return descriptionLines.join('\n');
+    if (parsed) {
+      // 根据缩进调整路径栈
+      while (pathStack.length > 0 && parsed.indent <= pathStack[pathStack.length - 1].indent) {
+        pathStack.pop();
       }
       
-      // 找到键但没有注释，继续查找下一个匹配（处理同名键的情况）
+      const currentPath = pathStack.map(p => p.key).concat(parsed.key).join('.');
+      const currentKeys = currentPath.split('.');
+      
+      // 检查是否匹配目标路径
+      if (parsed.key === key && currentKeys.length === targetKeys.length) {
+        // 验证完整路径匹配
+        let matches = true;
+        for (let k = 0; k < targetKeys.length; k++) {
+          if (currentKeys[k] !== targetKeys[k]) {
+            matches = false;
+            break;
+          }
+        }
+        
+        if (matches) {
+          // 找到目标键，向前查找注释
+          const descriptionLines: string[] = [];
+          const currentIndent = parsed.indent;
+          
+          for (let j = i - 1; j >= 0; j--) {
+            const prevLine = lines[j];
+            const prevTrimmed = prevLine.trim();
+            
+            // 跳过空行（但记录是否开始收集）
+            if (prevTrimmed === '') {
+              if (descriptionLines.length > 0) {
+                // 空行表示当前注释块结束
+                break;
+              }
+              continue;
+            }
+            
+            // 检查是否为注释
+            const comment = parseCommentLine(prevLine);
+            if (comment !== null) {
+              // 过滤掉分隔线
+              if (!comment.startsWith('===') && !comment.startsWith('---')) {
+                descriptionLines.unshift(comment);
+              }
+              continue;
+            }
+            
+            // 检查是否为其他键定义
+            const prevParsed = parseKeyLine(prevLine);
+            if (prevParsed) {
+              const prevIndent = prevLine.length - prevLine.trimStart().length;
+              
+              // 如果遇到一个键，根据层级关系决定是否停止
+              if (prevParsed.isSection) {
+                // TOML section 总是停止（新的顶级结构）
+                break;
+              }
+              
+              // 如果缩进 >= 当前键缩进，说明是同层级或更深层的键，继续查找
+              // 如果缩进 < 当前键缩进，说明是父层级的键，停止
+              if (prevIndent < currentIndent) {
+                break;
+              }
+              
+              // 同层级键，停止查找（它的注释属于它自己）
+              if (prevIndent === currentIndent) {
+                break;
+              }
+            }
+            
+            // 其他非注释、非空行内容，停止查找
+            break;
+          }
+          
+          if (descriptionLines.length > 0) {
+            return descriptionLines.join('\n');
+          }
+        }
+      }
+      
+      // 压入栈
+      pathStack.push({ key: parsed.key, indent: parsed.indent, lineIndex: i });
     }
   }
   
@@ -191,11 +293,14 @@ function extractConfigValues(
                    value === null ? 'null' : 
                    typeof value as ConfigValue['type'];
       
+      // 传递父路径用于层级感知的注释提取
+      const parentPath = path;
+      
       results.push({
         key,
         value,
         type,
-        description: extractDescription(content, key),
+        description: extractDescription(content, key, parentPath),
         path: currentPath,
         depth,
       });

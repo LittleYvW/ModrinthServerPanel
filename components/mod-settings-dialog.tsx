@@ -511,20 +511,22 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
                       {filteredLinkedFiles.map((file, index) => (
                         <motion.div
                           key={file.path}
-                          initial={{ opacity: 0, x: -60 }}
-                          animate={{ opacity: 1, x: 0 }}
+                          initial={{ opacity: 0, x: 100, scale: 0.9, rotateY: -15 }}
+                          animate={{ opacity: 1, x: 0, scale: 1, rotateY: 0 }}
                           transition={{
                             type: 'spring',
-                            stiffness: 300,
-                            damping: 24,
-                            delay: index * 0.05,
+                            stiffness: 280,
+                            damping: 22,
+                            mass: 1,
+                            delay: index * 0.08,
                           }}
                           className={cn(
-                            "group flex items-center gap-3 p-3 rounded-lg border transition-all duration-300",
+                            "group flex items-center gap-3 p-3 rounded-lg border",
                             file.autoDetected 
                               ? "bg-[#00d17a]/5 border-[#00d17a]/20 hover:border-[#00d17a]/40 hover:bg-[#00d17a]/10" 
                               : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#3a3a3a]"
                           )}
+                          style={{ perspective: 1000 }}
                         >
                           <div className={cn(
                             'p-2 rounded-lg',

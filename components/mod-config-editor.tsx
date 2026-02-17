@@ -359,9 +359,22 @@ interface ConfigItemEditorProps {
   isExpanded: boolean;
   onToggle: () => void;
   childConfigs?: ConfigValue[];
+  expandedPaths?: Set<string>;
+  toggleExpanded?: (path: string) => void;
+  allConfigValues?: ConfigValue[];
 }
 
-const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, childConfigs = [] }: ConfigItemEditorProps) => {
+const ConfigItemEditor = ({ 
+  config, 
+  value, 
+  onChange, 
+  isExpanded, 
+  onToggle, 
+  childConfigs = [],
+  expandedPaths = new Set(),
+  toggleExpanded = () => {},
+  allConfigValues = []
+}: ConfigItemEditorProps) => {
   const [localValue, setLocalValue] = useState(value);
   const [isEditing, setIsEditing] = useState(false);
   
@@ -558,17 +571,28 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
                 {/* 子项容器 - 带左边框表示层级 */}
                 <div className="px-3 pb-3">
                   <div className="pl-3 border-l-2 border-[#2a2a2a] space-y-1">
-                    {childConfigs.map((childConfig) => (
-                      <ConfigItemEditor
-                        key={childConfig.path}
-                        config={childConfig}
-                        value={childConfig.value}
-                        onChange={onChange}
-                        isExpanded={false}
-                        onToggle={() => {}}
-                        childConfigs={[]}
-                      />
-                    ))}
+                    {childConfigs.map((childConfig) => {
+                      // 计算子节点的子配置项
+                      const grandChildConfigs = allConfigValues.filter(
+                        c => c.path.startsWith(childConfig.path + '.') && c.depth === childConfig.depth + 1
+                      );
+                      const hasGrandChildren = grandChildConfigs.length > 0;
+                      
+                      return (
+                        <ConfigItemEditor
+                          key={childConfig.path}
+                          config={childConfig}
+                          value={childConfig.value}
+                          onChange={onChange}
+                          isExpanded={expandedPaths.has(childConfig.path)}
+                          onToggle={() => toggleExpanded(childConfig.path)}
+                          childConfigs={hasGrandChildren ? grandChildConfigs : []}
+                          expandedPaths={expandedPaths}
+                          toggleExpanded={toggleExpanded}
+                          allConfigValues={allConfigValues}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               </motion.div>
@@ -1228,6 +1252,9 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                               isExpanded={expandedPaths.has(config.path)}
                               onToggle={() => toggleExpanded(config.path)}
                               childConfigs={childConfigs}
+                              expandedPaths={expandedPaths}
+                              toggleExpanded={toggleExpanded}
+                              allConfigValues={configValues}
                             />
                           </motion.div>
                         );

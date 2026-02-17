@@ -688,128 +688,392 @@ const ConfigItemEditor = ({
   );
 };
 
-// 代码预览模式 - 使用 Prism 风格但不显示颜色代码
+// 代码预览模式 - 使用 Prism 风格语法高亮
 interface CodePreviewProps {
   content: string;
   type: 'json' | 'json5' | 'toml';
 }
 
+// Token 类型定义
+type TokenType = 
+  | 'string' | 'number' | 'boolean' | 'null' | 'key' 
+  | 'comment' | 'section' | 'punctuation' | 'operator' 
+  | 'escape' | 'text' | 'whitespace';
+
+interface Token {
+  type: TokenType;
+  value: string;
+}
+
+// 转义 HTML 特殊字符
+const escapeHtml = (str: string): string => 
+  str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// 词法分析器 - 将行文本解析为 token 数组
+const tokenizeLine = (line: string, fileType: 'json' | 'json5' | 'toml'): Token[] => {
+  const tokens: Token[] = [];
+  let pos = 0;
+  
+  // 辅助函数：添加 token
+  const addToken = (type: TokenType, value: string) => {
+    if (value) tokens.push({ type, value });
+  };
+  
+  // 辅助函数：查看当前字符
+  const peek = (offset = 0): string => line[pos + offset] || '';
+  
+  // 辅助函数：消费当前字符
+  const consume = (): string => line[pos++] || '';
+  
+  while (pos < line.length) {
+    const char = peek();
+    
+    // 1. 空白字符
+    if (/\s/.test(char)) {
+      let value = '';
+      while (/\s/.test(peek())) {
+        value += consume();
+      }
+      addToken('whitespace', value);
+      continue;
+    }
+    
+    // 2. 双引号字符串 (JSON/JSON5/TOML)
+    if (char === '"') {
+      let value = consume(); // 开始引号
+      while (peek()) {
+        const c = peek();
+        if (c === '\\') {
+          // 转义序列
+          const escapeSeq = consume() + consume();
+          addToken('escape', escapeSeq);
+          continue;
+        }
+        if (c === '"') {
+          value += consume(); // 结束引号
+          break;
+        }
+        value += consume();
+      }
+      addToken('string', value);
+      continue;
+    }
+    
+    // 3. 单引号字符串 (JSON5/TOML)
+    if ((fileType === 'json5' || fileType === 'toml') && char === "'") {
+      let value = consume(); // 开始引号
+      while (peek()) {
+        const c = peek();
+        if (c === '\\' && fileType === 'toml') {
+          // TOML 单引号字符串中的转义
+          const escapeSeq = consume() + consume();
+          addToken('escape', escapeSeq);
+          continue;
+        }
+        if (c === "'") {
+          value += consume(); // 结束引号
+          break;
+        }
+        value += consume();
+      }
+      addToken('string', value);
+      continue;
+    }
+    
+    // 4. 多行字符串 (TOML): """...""" 或 '''...'''
+    if (fileType === 'toml' && (peek(0) + peek(1) + peek(2) === '"""' || peek(0) + peek(1) + peek(2) === "'''")) {
+      const quote = consume() + consume() + consume();
+      let value = quote;
+      const endQuote = quote;
+      while (peek()) {
+        if (peek(0) + peek(1) + peek(2) === endQuote) {
+          value += consume() + consume() + consume();
+          break;
+        }
+        value += consume();
+      }
+      addToken('string', value);
+      continue;
+    }
+    
+    // 5. TOML section header: [section] 或 [[section]]
+    if (fileType === 'toml' && char === '[') {
+      // 检查是否是行首的 section
+      const beforeBracket = line.slice(0, pos).trim();
+      if (beforeBracket === '') {
+        let value = '';
+        while (peek() && peek() !== ']') {
+          value += consume();
+        }
+        if (peek() === ']') value += consume();
+        // 检查是否有第二个 ]
+        if (peek() === ']') value += consume();
+        addToken('section', value);
+        continue;
+      } else {
+        addToken('punctuation', consume());
+        continue;
+      }
+    }
+    
+    // 6. 注释 (JSON5: //, /* */; TOML: #)
+    if ((fileType === 'json5' && (peek(0) + peek(1) === '//' || peek(0) + peek(1) === '/*')) ||
+        (fileType === 'toml' && char === '#')) {
+      let value = '';
+      if (peek(0) + peek(1) === '/*') {
+        // 块注释
+        while (peek()) {
+          if (peek(0) + peek(1) === '*/') {
+            value += consume() + consume();
+            break;
+          }
+          value += consume();
+        }
+      } else {
+        // 行注释
+        while (peek()) value += consume();
+      }
+      addToken('comment', value);
+      continue;
+    }
+    
+    // 7. 数字 (整数、浮点数、科学计数法、十六进制等)
+    if (/[\d-]/.test(char)) {
+      // 检查是否是负数或数字开始
+      let value = '';
+      if (peek() === '-') value += consume();
+      
+      // 十六进制 (JSON5: 0x...)
+      if (fileType === 'json5' && peek() === '0' && (peek(1) === 'x' || peek(1) === 'X')) {
+        value += consume() + consume();
+        while (/[\da-fA-F]/.test(peek())) value += consume();
+        addToken('number', value);
+        continue;
+      }
+      
+      // 数字部分
+      while (/\d/.test(peek())) value += consume();
+      
+      // 小数部分
+      if (peek() === '.' && /\d/.test(peek(1))) {
+        value += consume();
+        while (/\d/.test(peek())) value += consume();
+      }
+      
+      // 指数部分
+      if (/[eE]/.test(peek())) {
+        value += consume();
+        if (peek() === '+' || peek() === '-') value += consume();
+        while (/\d/.test(peek())) value += consume();
+      }
+      
+      // TOML 特殊数字格式 (inf, nan, 日期时间)
+      if (fileType === 'toml' && /^[+-]?$/.test(value)) {
+        // 可能是 inf 或 nan
+        const rest = line.slice(pos);
+        if (/^inf/i.test(rest)) {
+          value += line.slice(pos, pos + 3);
+          pos += 3;
+        } else if (/^nan/i.test(rest)) {
+          value += line.slice(pos, pos + 3);
+          pos += 3;
+        }
+      }
+      
+      addToken('number', value);
+      continue;
+    }
+    
+    // 8. 标识符和关键字
+    if (/[a-zA-Z_]/.test(char)) {
+      let value = '';
+      while (/[a-zA-Z0-9_]/.test(peek())) value += consume();
+      
+      const lowerValue = value.toLowerCase();
+      
+      // 布尔值
+      if (lowerValue === 'true' || lowerValue === 'false') {
+        addToken('boolean', value);
+        continue;
+      }
+      
+      // null
+      if (lowerValue === 'null' || lowerValue === 'undefined') {
+        addToken('null', value);
+        continue;
+      }
+      
+      // TOML 特殊值
+      if (fileType === 'toml' && (lowerValue === 'inf' || lowerValue === 'nan')) {
+        addToken('number', value);
+        continue;
+      }
+      
+      // 可能是键名 - 检查后面是否跟着 : 或 =
+      const rest = line.slice(pos).trimStart();
+      if (rest.startsWith(':') || rest.startsWith('=')) {
+        addToken('key', value);
+      } else {
+        addToken('text', value);
+      }
+      continue;
+    }
+    
+    // 9. 键名检测 (带引号的键已在字符串处理)
+    // 检测 key: 或 key = 格式中的键名
+    if (/[a-zA-Z0-9_\-]/.test(char)) {
+      let value = '';
+      while (/[a-zA-Z0-9_\-]/.test(peek())) value += consume();
+      
+      // 检查后面是否跟着 : 或 =
+      const rest = line.slice(pos).trimStart();
+      if (rest.startsWith(':') || rest.startsWith('=')) {
+        addToken('key', value);
+      } else {
+        addToken('text', value);
+      }
+      continue;
+    }
+    
+    // 10. 操作符和标点符号
+    if (char === ':' || char === '=') {
+      addToken('operator', consume());
+      continue;
+    }
+    
+    if (/[{}[\],]/.test(char)) {
+      addToken('punctuation', consume());
+      continue;
+    }
+    
+    // 11. 其他字符
+    addToken('text', consume());
+  }
+  
+  return tokens;
+};
+
+// 后处理：标记 JSON 中作为键的字符串
+const postProcessTokens = (tokens: Token[], fileType: 'json' | 'json5' | 'toml'): Token[] => {
+  const result: Token[] = [];
+  
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    const nextNonSpace = tokens.slice(i + 1).find(t => t.type !== 'whitespace');
+    
+    // 如果字符串后面跟着 : 或 =，则标记为 key
+    if (token.type === 'string' && nextNonSpace?.type === 'operator') {
+      result.push({ ...token, type: 'key' });
+    } else {
+      result.push(token);
+    }
+  }
+  
+  return result;
+};
+
+// Token 样式映射
+const getTokenClassName = (type: TokenType): string => {
+  switch (type) {
+    case 'string':
+      return 'text-emerald-400';
+    case 'number':
+      return 'text-blue-400';
+    case 'boolean':
+      return 'text-purple-400';
+    case 'null':
+      return 'text-gray-500';
+    case 'key':
+      return 'text-amber-300';
+    case 'comment':
+      return 'text-gray-500 italic';
+    case 'section':
+      return 'text-amber-400 font-medium';
+    case 'punctuation':
+      return 'text-slate-400';
+    case 'operator':
+      return 'text-slate-300';
+    case 'escape':
+      return 'text-emerald-300';
+    case 'text':
+      return 'text-[#a0a0a0]';
+    case 'whitespace':
+      return '';
+    default:
+      return 'text-[#a0a0a0]';
+  }
+};
+
 const CodePreview = ({ content, type }: CodePreviewProps) => {
-  // 将内容分割成 token 进行高亮
-  const renderHighlighted = () => {
-    if (!content) return null;
-    
-    const lines = content.split('\n');
-    
-    return lines.map((line, lineIdx) => {
-      const tokens: React.ReactNode[] = [];
-      let remaining = line;
-      let keyCounter = 0;
-      
-      // 首先转义 HTML 特殊字符
-      const escapeHtml = (str: string) => str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-      
-      // TOML section header [section]
-      if (type === 'toml') {
-        const sectionMatch = remaining.match(/^(\s*)(\[)([^\]]+)(\])(\s*)$/);
-        if (sectionMatch) {
-          tokens.push(
-            <span key={keyCounter++}>{escapeHtml(sectionMatch[1])}</span>,
-            <span key={keyCounter++} className="text-amber-400">{escapeHtml(sectionMatch[2] + sectionMatch[3] + sectionMatch[4])}</span>,
-            <span key={keyCounter++}>{escapeHtml(sectionMatch[5])}</span>
-          );
-          remaining = '';
-        }
-      }
-      
-      // 逐行解析
-      while (remaining.length > 0) {
-        let matched = false;
-        
-        // 1. 字符串（双引号）- JSON/JSON5/TOML
-        const strMatch = remaining.match(/^([^"]*)"([^"]*)"(.*)$/);
-        if (strMatch) {
-          if (strMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(strMatch[1])}</span>);
-          tokens.push(<span key={keyCounter++} className="text-emerald-400">{escapeHtml('"' + strMatch[2] + '"')}</span>);
-          remaining = strMatch[3];
-          matched = true;
-          continue;
-        }
-        
-        // 2. 字符串（单引号）- JSON5/TOML
-        const strSingleMatch = remaining.match(/^([^']*)'([^']*)'(.*)$/);
-        if (strSingleMatch) {
-          if (strSingleMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(strSingleMatch[1])}</span>);
-          tokens.push(<span key={keyCounter++} className="text-emerald-400">{escapeHtml("'" + strSingleMatch[2] + "'")}</span>);
-          remaining = strSingleMatch[3];
-          matched = true;
-          continue;
-        }
-        
-        // 3. 数字
-        const numMatch = remaining.match(/^([^0-9\-]*)(-?\d+\.?\d*)(.*)$/);
-        if (numMatch && numMatch[2] && !isNaN(Number(numMatch[2]))) {
-          // 检查是否是键名的一部分（后面跟着 = 或 :）
-          const nextChar = numMatch[3].charAt(0);
-          if (nextChar !== '=' && nextChar !== ':') {
-            if (numMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(numMatch[1])}</span>);
-            tokens.push(<span key={keyCounter++} className="text-blue-400">{escapeHtml(numMatch[2])}</span>);
-            remaining = numMatch[3];
-            matched = true;
-            continue;
-          }
-        }
-        
-        // 4. 布尔值
-        const boolMatch = remaining.match(/^(.*?)(\b(?:true|false)\b)(.*)$/i);
-        if (boolMatch) {
-          if (boolMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(boolMatch[1])}</span>);
-          tokens.push(<span key={keyCounter++} className="text-purple-400">{escapeHtml(boolMatch[2])}</span>);
-          remaining = boolMatch[3];
-          matched = true;
-          continue;
-        }
-        
-        // 5. null
-        const nullMatch = remaining.match(/^(.*?)(\bnull\b)(.*)$/);
-        if (nullMatch) {
-          if (nullMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(nullMatch[1])}</span>);
-          tokens.push(<span key={keyCounter++} className="text-gray-500">{escapeHtml(nullMatch[2])}</span>);
-          remaining = nullMatch[3];
-          matched = true;
-          continue;
-        }
-        
-        // 6. 注释（TOML/JSON5）
-        if (type === 'toml' || type === 'json5') {
-          const commentMatch = remaining.match(/^(.*?)(#|\/\/)(.*)$/);
-          if (commentMatch) {
-            if (commentMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(commentMatch[1])}</span>);
-            tokens.push(<span key={keyCounter++} className="text-gray-600 italic">{escapeHtml(commentMatch[2] + commentMatch[3])}</span>);
-            remaining = '';
-            matched = true;
-            continue;
-          }
-        }
-        
-        // 没有匹配到任何 token，直接添加剩余部分
-        if (!matched) {
-          tokens.push(<span key={keyCounter++}>{escapeHtml(remaining)}</span>);
-          remaining = '';
-        }
-      }
-      
-      return <div key={lineIdx}>{tokens}</div>;
+  // 解析所有行
+  const lines = useMemo(() => {
+    if (!content) return [];
+    return content.split('\n').map(line => {
+      const tokens = tokenizeLine(line, type);
+      return postProcessTokens(tokens, type);
     });
+  }, [content, type]);
+  
+  // 计算行号宽度
+  const lineNumberWidth = useMemo(() => {
+    const digits = String(lines.length).length;
+    return Math.max(2, digits) * 0.6 + 1; // em
+  }, [lines.length]);
+  
+  // 渲染 token
+  const renderToken = (token: Token, index: number): React.ReactNode => {
+    const className = getTokenClassName(token.type);
+    const escaped = escapeHtml(token.value);
+    
+    // 将空格转换为不可见空格字符以保持缩进
+    const displayValue = token.type === 'whitespace' 
+      ? escaped.replace(/ /g, '\u00A0').replace(/\t/g, '\u00A0\u00A0')
+      : escaped;
+    
+    return (
+      <span 
+        key={index} 
+        className={className}
+        {...(token.type === 'whitespace' ? { 'data-whitespace': true } : {})}
+      >
+        {displayValue}
+      </span>
+    );
   };
   
   return (
-    <pre className="font-mono text-sm leading-relaxed p-4 overflow-auto whitespace-pre-wrap break-all text-[#a0a0a0]">
-      <code>{renderHighlighted()}</code>
-    </pre>
+    <div className="flex font-mono text-sm leading-6">
+      {/* 行号列 */}
+      <div 
+        className="flex-shrink-0 py-4 text-right select-none border-r border-[#2a2a2a] bg-[#0a0a0a]"
+        style={{ minWidth: `${lineNumberWidth}rem` }}
+      >
+        {lines.map((_, idx) => (
+          <div 
+            key={idx} 
+            className="px-3 text-gray-600 text-xs leading-6"
+          >
+            {idx + 1}
+          </div>
+        ))}
+      </div>
+      
+      {/* 代码列 */}
+      <div className="flex-1 overflow-auto">
+        <pre className="py-4">
+          <code>
+            {lines.map((tokens, lineIdx) => (
+              <div key={lineIdx} className="px-4 min-h-[1.5rem]">
+                {tokens.length > 0 
+                  ? tokens.map((token, tokenIdx) => renderToken(token, tokenIdx))
+                  : <span className="text-gray-700">&#9585;</span> // 空行指示
+                }
+              </div>
+            ))}
+          </code>
+        </pre>
+      </div>
+    </div>
   );
 };
 
@@ -848,31 +1112,35 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   
   // 监听 parsed 变化，与原始内容比较以确定是否有更改
   useEffect(() => {
-    if (!parsed || !originalContent) {
-      setHasChanges(false);
-      return;
-    }
-    
-    try {
-      let originalParsed: unknown;
-      if (fileType === 'toml') {
-        const { parse: parseTOML } = require('@iarna/toml');
-        originalParsed = parseTOML(originalContent);
-      } else if (fileType === 'json5') {
-        const JSON5 = require('json5');
-        originalParsed = JSON5.parse(originalContent);
-      } else {
-        originalParsed = JSON.parse(originalContent);
+    const compareContent = async () => {
+      if (!parsed || !originalContent) {
+        setHasChanges(false);
+        return;
       }
       
-      const changed = !isDeepEqual(parsed, originalParsed);
-      setHasChanges(changed);
-      if (!changed) {
-        setSaveSuccess(false);
+      try {
+        let originalParsed: unknown;
+        if (fileType === 'toml') {
+          const { parse: parseTOML } = await import('@iarna/toml');
+          originalParsed = parseTOML(originalContent);
+        } else if (fileType === 'json5') {
+          const JSON5 = await import('json5');
+          originalParsed = JSON5.parse(originalContent);
+        } else {
+          originalParsed = JSON.parse(originalContent);
+        }
+        
+        const changed = !isDeepEqual(parsed, originalParsed);
+        setHasChanges(changed);
+        if (!changed) {
+          setSaveSuccess(false);
+        }
+      } catch {
+        // 解析失败时保持当前状态
       }
-    } catch {
-      // 解析失败时保持当前状态
-    }
+    };
+    
+    compareContent();
   }, [parsed, originalContent, fileType, isDeepEqual]);
   
   // 加载文件内容

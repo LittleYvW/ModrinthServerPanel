@@ -481,6 +481,21 @@ const ConfigItemEditor = ({
     }
   };
   
+  // 高亮注释中的数字
+  const highlightNumbersInText = (text: string): React.ReactNode => {
+    const parts = text.split(/(\d+)/);
+    return parts.map((part, i) => {
+      if (/^\d+$/.test(part)) {
+        return (
+          <span key={i} className="text-blue-400 font-medium">
+            {part}
+          </span>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+  
   // 渲染对象/数组的展开头部
   if (hasChildren) {
     // 将描述按换行分割
@@ -549,7 +564,7 @@ const ConfigItemEditor = ({
                         key={index} 
                         className="text-xs text-[#707070] leading-relaxed whitespace-pre-wrap break-words text-left"
                       >
-                        {line || '\u00A0'}
+                        {line ? highlightNumbersInText(line) : '\u00A0'}
                       </p>
                     ))}
                   </div>
@@ -662,7 +677,7 @@ const ConfigItemEditor = ({
                   key={index} 
                   className="text-xs text-[#707070] leading-relaxed whitespace-pre-wrap break-words"
                 >
-                  {line || '\u00A0'}
+                  {line ? highlightNumbersInText(line) : '\u00A0'}
                 </p>
               ))}
             </div>

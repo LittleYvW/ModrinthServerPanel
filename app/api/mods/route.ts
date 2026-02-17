@@ -14,7 +14,16 @@ export async function GET() {
       serverOnly: mods.filter(m => m.category === 'server-only'),
       clientOnly: mods.filter(m => m.category === 'client-only'),
     };
-    return NextResponse.json({ mods, categorized, config: { showServerOnlyMods: config.showServerOnlyMods ?? true } });
+    return NextResponse.json({ 
+      mods, 
+      categorized, 
+      config: { 
+        showServerOnlyMods: config.showServerOnlyMods ?? true,
+        minecraftVersion: config.minecraftVersion,
+        loader: config.loader,
+        loaderVersion: config.loaderVersion,
+      } 
+    });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to get mods' },

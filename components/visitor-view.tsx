@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Download, Package, Users, Server, Loader2, Monitor, Star } from 'lucide-react';
+import { Download, Package, Users, Server, Loader2, Monitor, Star, Box, Wrench } from 'lucide-react';
 import { 
   fadeIn, 
   fadeInUp, 
@@ -40,13 +40,30 @@ interface CategorizedMods {
   clientOnly: Mod[];
 }
 
+type Loader = 'fabric' | 'forge' | 'quilt' | 'neoforge';
+
 interface Config {
   showServerOnlyMods: boolean;
+  minecraftVersion: string;
+  loader: Loader;
+  loaderVersion: string;
 }
+
+const loaderConfig: Record<Loader, { label: string; color: string; bgColor: string }> = {
+  fabric: { label: 'Fabric', color: '#dbb69b', bgColor: 'rgba(219, 182, 155, 0.15)' },
+  forge: { label: 'Forge', color: '#e67e22', bgColor: 'rgba(230, 126, 34, 0.15)' },
+  quilt: { label: 'Quilt', color: '#9b59b6', bgColor: 'rgba(155, 89, 182, 0.15)' },
+  neoforge: { label: 'NeoForge', color: '#e67e22', bgColor: 'rgba(230, 126, 34, 0.15)' },
+};
 
 export function VisitorView() {
   const [mods, setMods] = useState<CategorizedMods>({ both: [], serverOnly: [], clientOnly: [] });
-  const [config, setConfig] = useState<Config>({ showServerOnlyMods: true });
+  const [config, setConfig] = useState<Config>({ 
+    showServerOnlyMods: true,
+    minecraftVersion: '',
+    loader: 'fabric',
+    loaderVersion: '',
+  });
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [batchDownloadingClient, setBatchDownloadingClient] = useState(false);
@@ -135,6 +152,62 @@ export function VisitorView() {
       animate="visible"
       variants={fadeIn}
     >
+      {/* 服务端配置信息 - 醒目展示 */}
+      {config.minecraftVersion && (
+        <motion.div
+          className="max-w-2xl mx-auto"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05, duration: 0.4 }}
+        >
+          <div className="relative overflow-hidden rounded-xl border border-[#00d17a]/30 bg-gradient-to-r from-[#00d17a]/10 via-[#00d17a]/5 to-[#00d17a]/10 p-4">
+            {/* 装饰性背景 */}
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiMwMGQxN2EiIG9wYWNpdHk9IjAuMSIvPjwvc3ZnPg==')] opacity-50" />
+            
+            <div className="relative flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+              {/* 标题 */}
+              <div className="flex items-center gap-2 text-[#00d17a] shrink-0">
+                <Server className="w-5 h-5" />
+                <span className="font-semibold text-sm">客户端基本要求</span>
+              </div>
+              
+              {/* 分隔线 */}
+              <div className="hidden sm:block w-px h-8 bg-[#00d17a]/30" />
+              
+              {/* 配置信息 */}
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {/* Minecraft 版本 */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1a1a1a]/80 border border-[#2a2a2a]">
+                  <Box className="w-4 h-4 text-[#00d17a]" />
+                  <span className="text-white font-medium">{config.minecraftVersion}</span>
+                </div>
+                
+                {/* 加载器类型 */}
+                {config.loader && (
+                  <div 
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border"
+                    style={{ 
+                      backgroundColor: loaderConfig[config.loader].bgColor,
+                      borderColor: `${loaderConfig[config.loader].color}40`,
+                    }}
+                  >
+                    <Wrench className="w-4 h-4" style={{ color: loaderConfig[config.loader].color }} />
+                    <span className="font-medium" style={{ color: loaderConfig[config.loader].color }}>
+                      {loaderConfig[config.loader].label}
+                    </span>
+                    {config.loaderVersion && (
+                      <span className="text-[#a0a0a0] text-sm">
+                        {config.loaderVersion}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* 欢迎信息 */}
       <motion.div 
         className="text-center space-y-2"

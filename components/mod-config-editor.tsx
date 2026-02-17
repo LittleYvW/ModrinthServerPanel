@@ -113,27 +113,44 @@ const getTypeBgColor = (type: ConfigValue['type']) => {
   }
 };
 
-// 检测行是否为键定义行，返回键名和缩进层级
-function parseKeyLine(line: string): { key: string; indent: number; isSection: boolean } | null {
+// 检测行是否为键定义行，返回键名、完整路径和缩进层级
+// 支持嵌套 section 如 [M.m] -> key='m', fullPath=['M', 'm']
+function parseKeyLine(line: string): { 
+  key: string; 
+  fullPath: string[];
+  indent: number; 
+  isSection: boolean;
+  isNestedSection: boolean;
+} | null {
   const indent = line.length - line.trimStart().length;
   const trimmed = line.trim();
   
-  // TOML section: [key] 或 [[key]]
+  // TOML section: [key] 或 [[key]] 或 [a.b.c]
   const sectionMatch = trimmed.match(/^\[\[?\s*([^\]]+)\s*\]\]?$/);
   if (sectionMatch) {
-    return { key: sectionMatch[1].trim(), indent, isSection: true };
+    const sectionName = sectionMatch[1].trim();
+    // 处理嵌套 section 如 "M.m" -> ['M', 'm']
+    const pathParts = sectionName.split('.').map(p => p.trim());
+    const key = pathParts[pathParts.length - 1];
+    return { 
+      key, 
+      fullPath: pathParts,
+      indent, 
+      isSection: true,
+      isNestedSection: pathParts.length > 1
+    };
   }
   
   // JSON: "key": 或 "key" :
   const jsonMatch = trimmed.match(/^"([^"]+)"\s*:/);
   if (jsonMatch) {
-    return { key: jsonMatch[1], indent, isSection: false };
+    return { key: jsonMatch[1], fullPath: [jsonMatch[1]], indent, isSection: false, isNestedSection: false };
   }
   
   // JSON5/TOML: 'key': 或 key: 或 key =
   const json5Match = trimmed.match(/^'([^']+)'\s*[:=]/);
   if (json5Match) {
-    return { key: json5Match[1], indent, isSection: false };
+    return { key: json5Match[1], fullPath: [json5Match[1]], indent, isSection: false, isNestedSection: false };
   }
   
   // Bare key (JSON5/TOML): key: 或 key = (但排除 true/false/null/数字)
@@ -142,7 +159,7 @@ function parseKeyLine(line: string): { key: string; indent: number; isSection: b
     const key = bareMatch[1];
     // 排除关键字和数字
     if (!/^(true|false|null|undefined)$/.test(key)) {
-      return { key, indent, isSection: false };
+      return { key, fullPath: [key], indent, isSection: false, isNestedSection: false };
     }
   }
   
@@ -165,7 +182,7 @@ function parseCommentLine(line: string): string | null {
   return null;
 }
 
-// 从注释提取描述（支持层级感知）
+// 从注释提取描述（支持层级感知，包括嵌套 section）
 function extractDescription(
   content: string, 
   key: string, 
@@ -173,29 +190,49 @@ function extractDescription(
 ): string | undefined {
   const lines = content.split('\n');
   
-  // 构建目标路径
-  const targetPath = parentPath ? `${parentPath}.${key}` : key;
-  const targetKeys = targetPath.split('.');
+  // 构建目标路径数组
+  const targetKeys = parentPath ? [...parentPath.split('.'), key] : [key];
   
-  // 跟踪当前解析的层级结构
-  const pathStack: { key: string; indent: number; lineIndex: number }[] = [];
+  // 跟踪当前解析的层级结构（存储完整路径）
+  const sectionStack: { keys: string[]; indent: number; lineIndex: number }[] = [];
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const parsed = parseKeyLine(line);
     
     if (parsed) {
-      // 根据缩进调整路径栈
-      while (pathStack.length > 0 && parsed.indent <= pathStack[pathStack.length - 1].indent) {
-        pathStack.pop();
+      // 处理嵌套 section [M.m] -> fullPath=['M', 'm']
+      // 这种情况下，需要基于 fullPath 调整栈
+      if (parsed.isSection && parsed.isNestedSection) {
+        // 嵌套 section：根据 fullPath 长度调整栈
+        while (sectionStack.length >= parsed.fullPath.length) {
+          sectionStack.pop();
+        }
+      } else if (parsed.isSection) {
+        // 普通 section：根据缩进调整
+        while (sectionStack.length > 0 && parsed.indent <= sectionStack[sectionStack.length - 1].indent) {
+          sectionStack.pop();
+        }
+      } else {
+        // 普通键：根据缩进调整
+        while (sectionStack.length > 0 && parsed.indent <= sectionStack[sectionStack.length - 1].indent) {
+          sectionStack.pop();
+        }
       }
       
-      const currentPath = pathStack.map(p => p.key).concat(parsed.key).join('.');
-      const currentKeys = currentPath.split('.');
+      // 构建当前完整路径
+      let currentKeys: string[];
+      if (parsed.isSection && parsed.isNestedSection) {
+        // 嵌套 section 使用其完整路径
+        currentKeys = parsed.fullPath;
+      } else {
+        // 普通键或 section 基于栈构建路径
+        const parentKeys = sectionStack.length > 0 ? sectionStack[sectionStack.length - 1].keys : [];
+        currentKeys = [...parentKeys, parsed.key];
+      }
       
       // 检查是否匹配目标路径
-      if (parsed.key === key && currentKeys.length === targetKeys.length) {
-        // 验证完整路径匹配
+      if (currentKeys.length === targetKeys.length) {
         let matches = true;
         for (let k = 0; k < targetKeys.length; k++) {
           if (currentKeys[k] !== targetKeys[k]) {
@@ -216,7 +253,6 @@ function extractDescription(
             // 跳过空行（但记录是否开始收集）
             if (prevTrimmed === '') {
               if (descriptionLines.length > 0) {
-                // 空行表示当前注释块结束
                 break;
               }
               continue;
@@ -225,7 +261,6 @@ function extractDescription(
             // 检查是否为注释
             const comment = parseCommentLine(prevLine);
             if (comment !== null) {
-              // 过滤掉分隔线
               if (!comment.startsWith('===') && !comment.startsWith('---')) {
                 descriptionLines.unshift(comment);
               }
@@ -237,25 +272,22 @@ function extractDescription(
             if (prevParsed) {
               const prevIndent = prevLine.length - prevLine.trimStart().length;
               
-              // 如果遇到一个键，根据层级关系决定是否停止
               if (prevParsed.isSection) {
-                // TOML section 总是停止（新的顶级结构）
+                // TOML section 总是停止
                 break;
               }
               
-              // 如果缩进 >= 当前键缩进，说明是同层级或更深层的键，继续查找
-              // 如果缩进 < 当前键缩进，说明是父层级的键，停止
+              // 根据缩进判断边界
               if (prevIndent < currentIndent) {
                 break;
               }
               
-              // 同层级键，停止查找（它的注释属于它自己）
               if (prevIndent === currentIndent) {
                 break;
               }
             }
             
-            // 其他非注释、非空行内容，停止查找
+            // 其他非注释内容，停止
             break;
           }
           
@@ -266,7 +298,7 @@ function extractDescription(
       }
       
       // 压入栈
-      pathStack.push({ key: parsed.key, indent: parsed.indent, lineIndex: i });
+      sectionStack.push({ keys: currentKeys, indent: parsed.indent, lineIndex: i });
     }
   }
   

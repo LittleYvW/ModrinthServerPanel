@@ -394,31 +394,51 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
               </div>
             </DialogHeader>
             
-            {/* 扫描结果提示 */}
+            {/* 扫描结果提示 - 带布局动画 */}
             <AnimatePresence>
               {showScanResults && scanResults && (
                 <motion.div
-                  initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                  transition={{ 
-                    duration: 0.3, 
-                    ease: [0.4, 0, 0.2, 1],
-                    exit: { duration: 0.2 }
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ 
+                    opacity: 1, 
+                    height: 'auto',
                   }}
+                  exit={{ 
+                    opacity: 0, 
+                    height: 0,
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1],
+                  }}
+                  style={{ overflow: 'hidden' }}
                   className="px-6"
                 >
-                  <div className={cn(
-                    'flex items-center gap-3 px-4 py-3 rounded-lg border',
-                    scanResults.length > 0 
-                      ? 'bg-[#00d17a]/10 text-[#00d17a] border-[#00d17a]/20' 
-                      : 'bg-[#707070]/10 text-[#a0a0a0] border-[#707070]/20'
-                  )}>
+                  <motion.div
+                    initial={{ y: -20, scale: 0.95 }}
+                    animate={{ 
+                      y: 0, 
+                      scale: 1,
+                      transition: { delay: 0.05, duration: 0.25, ease: [0.4, 0, 0.2, 1] }
+                    }}
+                    exit={{ 
+                      y: -10, 
+                      scale: 0.98,
+                      transition: { duration: 0.2 }
+                    }}
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-3 rounded-lg border mb-4',
+                      scanResults.length > 0 
+                        ? 'bg-[#00d17a]/10 text-[#00d17a] border-[#00d17a]/20' 
+                        : 'bg-[#707070]/10 text-[#a0a0a0] border-[#707070]/20'
+                    )}
+                  >
                     {scanResults.length > 0 ? (
                       <>
                         <motion.div
                           initial={{ scale: 0, rotate: -180 }}
                           animate={{ scale: 1, rotate: 0 }}
+                          exit={{ scale: 0, rotate: 180 }}
                           transition={{ type: 'spring', stiffness: 500, damping: 15, delay: 0.1 }}
                         >
                           <Check className="w-5 h-5" />
@@ -430,6 +450,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
                         <motion.div
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
+                          exit={{ scale: 0 }}
                           transition={{ type: 'spring', stiffness: 500, damping: 15, delay: 0.1 }}
                         >
                           <AlertCircle className="w-5 h-5" />
@@ -437,7 +458,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
                         <span className="font-medium">未找到相关配置文件</span>
                       </>
                     )}
-                  </div>
+                  </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>

@@ -406,11 +406,11 @@ const ConfigItemEditor = ({
             )}
           >
             <motion.div
-              className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm"
+              className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm"
               animate={{ 
-                left: localValue ? 'calc(100% - 1.375rem)' : '0.125rem' 
+                x: localValue ? 20 : 0 
               }}
-              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
             />
           </motion.button>
         );

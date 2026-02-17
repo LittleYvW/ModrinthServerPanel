@@ -22,7 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { 
   fadeIn, 
@@ -115,7 +115,7 @@ const getTypeBgColor = (type: ConfigValue['type']) => {
   }
 };
 
-// 从注释提取描述（简单的启发式方法）
+// 从注释提取描述（保留换行格式）
 function extractDescription(content: string, key: string): string | undefined {
   const lines = content.split('\n');
   
@@ -123,13 +123,14 @@ function extractDescription(content: string, key: string): string | undefined {
     const line = lines[i];
     // 查找包含该键的行
     if (line.includes(`"${key}"`) || line.includes(`${key}:`) || line.includes(`${key} =`)) {
-      // 向前查找注释
-      const descriptions: string[] = [];
-      for (let j = Math.max(0, i - 5); j < i; j++) {
-        const prevLine = lines[j].trim();
-        // JSON/JSON5 风格的注释
-        if (prevLine.startsWith('//') || prevLine.startsWith('#') || prevLine.startsWith('/*')) {
-          const comment = prevLine
+      // 向前查找注释（保留原始格式）
+      const descriptionLines: string[] = [];
+      for (let j = Math.max(0, i - 10); j < i; j++) {
+        const prevLine = lines[j];
+        const trimmedLine = prevLine.trim();
+        // JSON/JSON5/TOML 风格的注释
+        if (trimmedLine.startsWith('//') || trimmedLine.startsWith('#') || trimmedLine.startsWith('/*') || trimmedLine.startsWith('*')) {
+          const comment = trimmedLine
             .replace(/^\/\//, '')
             .replace(/^#/, '')
             .replace(/^\/\*/, '')
@@ -137,12 +138,16 @@ function extractDescription(content: string, key: string): string | undefined {
             .replace(/^\*\s*/, '')
             .trim();
           if (comment && !comment.startsWith('===') && !comment.startsWith('---')) {
-            descriptions.push(comment);
+            descriptionLines.push(comment);
           }
+        } else if (trimmedLine === '' && descriptionLines.length > 0) {
+          // 空行表示注释块结束，保留为换行
+          break;
         }
       }
-      if (descriptions.length > 0) {
-        return descriptions.join(' ');
+      if (descriptionLines.length > 0) {
+        // 保留换行，使用特殊分隔符，渲染时再处理
+        return descriptionLines.join('\n');
       }
     }
   }
@@ -312,6 +317,9 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
   
   // 渲染对象/数组的展开头部
   if (hasChildren) {
+    // 将描述按换行分割
+    const descriptionLines = config.description ? config.description.split('\n') : [];
+    
     return (
       <motion.div
         layout
@@ -333,49 +341,59 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
           {/* 头部 - 可点击展开 */}
           <button
             onClick={onToggle}
-            className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-white/[0.02] transition-colors"
+            className="w-full px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
           >
-            {/* 展开指示器 */}
-            <motion.div
-              animate={{ rotate: isExpanded ? 90 : 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex-shrink-0 text-[#707070]"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </motion.div>
-            
-            {/* 类型图标 */}
-            <div className={cn('flex-shrink-0', getTypeColor(config.type))}>
-              <ValueTypeIcon type={config.type} />
-            </div>
-            
-            {/* 键名 */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  'font-medium text-sm',
-                  config.depth === 0 ? 'text-white' : 'text-[#a0a0a0]'
-                )}>
-                  {config.key}
-                </span>
-                <Badge 
-                  variant="outline" 
-                  className={cn(
-                    'text-[10px] px-1.5 py-0 h-4 border-0 font-normal',
-                    getTypeBgColor(config.type),
-                    getTypeColor(config.type)
-                  )}
-                >
-                  {childrenCount} 项
-                </Badge>
+            <div className="flex items-start gap-3">
+              {/* 展开指示器 */}
+              <motion.div
+                animate={{ rotate: isExpanded ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex-shrink-0 text-[#707070] mt-0.5"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </motion.div>
+              
+              {/* 类型图标 */}
+              <div className={cn('flex-shrink-0 mt-0.5', getTypeColor(config.type))}>
+                <ValueTypeIcon type={config.type} />
               </div>
               
-              {/* 描述 */}
-              {config.description && (
-                <p className="text-xs text-[#707070] mt-0.5 leading-relaxed line-clamp-1">
-                  {config.description}
-                </p>
-              )}
+              {/* 键名和描述 */}
+              <div className="flex-1 min-w-0 flex flex-col gap-1">
+                {/* 键名和数量标签 */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={cn(
+                    'font-medium text-sm',
+                    config.depth === 0 ? 'text-white' : 'text-[#a0a0a0]'
+                  )}>
+                    {config.key}
+                  </span>
+                  <Badge 
+                    variant="outline" 
+                    className={cn(
+                      'text-[10px] px-1.5 py-0 h-4 border-0 font-normal flex-shrink-0',
+                      getTypeBgColor(config.type),
+                      getTypeColor(config.type)
+                    )}
+                  >
+                    {childrenCount} 项
+                  </Badge>
+                </div>
+                
+                {/* 描述 - 完整展示，保留换行 */}
+                {descriptionLines.length > 0 && (
+                  <div className="space-y-0.5 mt-0.5">
+                    {descriptionLines.map((line, index) => (
+                      <p 
+                        key={index} 
+                        className="text-xs text-[#707070] leading-relaxed whitespace-pre-wrap break-words text-left"
+                      >
+                        {line || '\u00A0'}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </button>
           
@@ -413,7 +431,10 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
     );
   }
   
-  // 渲染叶节点（基本类型）- 表格行样式
+  // 渲染叶节点（基本类型）- 完整描述展示
+  // 将描述按换行分割
+  const descriptionLines = config.description ? config.description.split('\n') : [];
+  
   return (
     <motion.div
       layout
@@ -425,57 +446,60 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
       style={{ marginLeft: `${config.depth * 12}px` }}
     >
       <div className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-lg border transition-all duration-200',
+        'flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-all duration-200',
         'hover:border-[#3a3a3a] hover:bg-white/[0.02]',
         getTypeBgColor(config.type)
       )}>
         {/* 左侧占位（保持对齐） */}
-        <div className="w-4 flex-shrink-0" />
+        <div className="w-4 flex-shrink-0 mt-0.5" />
         
         {/* 类型图标 */}
-        <div className={cn('flex-shrink-0', getTypeColor(config.type))}>
+        <div className={cn('flex-shrink-0 mt-0.5', getTypeColor(config.type))}>
           <ValueTypeIcon type={config.type} />
         </div>
         
-        {/* 键名和描述区域 */}
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              'font-medium text-sm',
-              config.depth === 0 ? 'text-white' : 'text-[#b0b0b0]'
-            )}>
-              {config.key}
-            </span>
-            <Badge 
-              variant="outline" 
-              className={cn(
-                'text-[9px] px-1 py-0 h-3.5 border-0 font-normal opacity-60',
-                getTypeBgColor(config.type),
-                getTypeColor(config.type)
-              )}
-            >
-              {config.type}
-            </Badge>
+        {/* 键名、描述和编辑器区域 */}
+        <div className="flex-1 min-w-0 flex flex-col gap-1">
+          {/* 第一行：键名 + 类型标签 + 编辑器 */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className={cn(
+                'font-medium text-sm',
+                config.depth === 0 ? 'text-white' : 'text-[#b0b0b0]'
+              )}>
+                {config.key}
+              </span>
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  'text-[9px] px-1 py-0 h-3.5 border-0 font-normal opacity-60 flex-shrink-0',
+                  getTypeBgColor(config.type),
+                  getTypeColor(config.type)
+                )}
+              >
+                {config.type}
+              </Badge>
+            </div>
+            
+            {/* 值编辑器区域 */}
+            <div className="flex-shrink-0">
+              {renderEditor()}
+            </div>
           </div>
           
-          {/* 描述 */}
-          {config.description && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <p className="text-xs text-[#707070] leading-snug mt-0.5 line-clamp-1 cursor-help">
-                  {config.description}
+          {/* 描述 - 完整展示，保留换行 */}
+          {descriptionLines.length > 0 && (
+            <div className="space-y-0.5 mt-0.5">
+              {descriptionLines.map((line, index) => (
+                <p 
+                  key={index} 
+                  className="text-xs text-[#707070] leading-relaxed whitespace-pre-wrap break-words"
+                >
+                  {line || '\u00A0'}
                 </p>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-sm">
-                <p className="text-xs">{config.description}</p>
-              </TooltipContent>
-            </Tooltip>
+              ))}
+            </div>
           )}
-        </div>
-        
-        {/* 值编辑器区域 */}
-        <div className="flex-shrink-0 flex items-center">
-          {renderEditor()}
         </div>
       </div>
     </motion.div>
@@ -639,20 +663,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         setOriginalContent(data.content);
         setParsed(data.parsed);
         
-        // 默认展开所有
-        if (data.parsed && typeof data.parsed === 'object') {
-          const allPaths = new Set<string>();
-          const collectPaths = (obj: unknown, path: string = '') => {
-            if (typeof obj === 'object' && obj !== null) {
-              allPaths.add(path);
-              for (const key of Object.keys(obj)) {
-                collectPaths((obj as Record<string, unknown>)[key], path ? `${path}.${key}` : key);
-              }
-            }
-          };
-          collectPaths(data.parsed);
-          setExpandedPaths(allPaths);
-        }
+              // 默认收起所有节点（expandedPaths 保持为空）
       } else {
         setError(data.error || 'Failed to load file');
       }
@@ -833,13 +844,12 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   }
   
   return (
-    <TooltipProvider>
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={fadeIn}
-        className="flex flex-col h-full"
-      >
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={fadeIn}
+      className="flex flex-col h-full"
+    >
         {/* 工具栏 */}
         <div className="flex items-center justify-between p-4 border-b border-[#2a2a2a] bg-[#151515]/50">
           <div className="flex items-center gap-3">
@@ -1080,7 +1090,6 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
           </AnimatePresence>
         </div>
       </motion.div>
-    </TooltipProvider>
   );
 }
 

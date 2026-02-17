@@ -66,14 +66,14 @@ const FileTypeIcon = ({ type, className }: { type: string; className?: string })
 const ValueTypeIcon = ({ type }: { type: ConfigValue['type'] }) => {
   switch (type) {
     case 'string':
-      return <Type className="w-3 h-3" />;
+      return <Type className="w-4 h-4" />;
     case 'number':
-      return <Hash className="w-3 h-3" />;
+      return <Hash className="w-4 h-4" />;
     case 'boolean':
-      return <ToggleLeft className="w-3 h-3" />;
+      return <ToggleLeft className="w-4 h-4" />;
     case 'object':
     case 'array':
-      return <Braces className="w-3 h-3" />;
+      return <Braces className="w-4 h-4" />;
     default:
       return null;
   }
@@ -401,12 +401,12 @@ const ConfigItemEditor = ({
             whileTap={{ scale: 0.95 }}
             onClick={() => handleChange(!localValue)}
             className={cn(
-              'relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0',
+              'relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0',
               localValue ? 'bg-emerald-500' : 'bg-[#3a3a3a]'
             )}
           >
             <motion.div
-              className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm"
+              className="absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-sm"
               animate={{ 
                 x: localValue ? 20 : 0 
               }}
@@ -442,7 +442,7 @@ const ConfigItemEditor = ({
                 }
               }}
               className={cn(
-                'px-3 py-1.5 rounded-md bg-[#141414] border text-sm font-mono w-28 h-8',
+                'px-3 py-2 rounded-md bg-[#141414] border text-base font-mono w-32 h-9',
                 'focus:outline-none focus:ring-2 focus:ring-emerald-500/40',
                 'transition-all duration-200 text-right',
                 isEditing ? 'border-emerald-500 text-white' : 'border-[#2a2a2a] text-blue-400'
@@ -461,7 +461,7 @@ const ConfigItemEditor = ({
               onFocus={() => setIsEditing(true)}
               onBlur={() => setIsEditing(false)}
               className={cn(
-                'w-full px-3 py-1.5 rounded-md bg-[#141414] border text-sm h-8',
+                'w-full px-3 py-2 rounded-md bg-[#141414] border text-base h-9',
                 'focus:outline-none focus:ring-2 focus:ring-emerald-500/40',
                 'transition-all duration-200',
                 isEditing ? 'border-emerald-500 text-white' : 'border-[#2a2a2a] text-emerald-400'
@@ -472,7 +472,7 @@ const ConfigItemEditor = ({
         
       default:
         return (
-          <span className="text-[#707070] text-sm italic px-3 py-1.5">
+          <span className="text-[#707070] text-base italic px-3 py-2">
             {Array.isArray(localValue) ? `[${(localValue as unknown[]).length} 项]` : 
              typeof localValue === 'object' ? `{${Object.keys(localValue || {}).length} 个键}` : 
              String(localValue)}
@@ -504,7 +504,7 @@ const ConfigItemEditor = ({
     return (
       <div
         className="group"
-        style={{ marginLeft: `${config.depth * 12}px` }}
+        style={{ marginLeft: `${config.depth * 16}px` }}
       >
         {/* 父级项 - 卡片样式 */}
         <div 
@@ -517,37 +517,37 @@ const ConfigItemEditor = ({
           {/* 头部 - 可点击展开 */}
           <button
             onClick={onToggle}
-            className="w-full px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
+            className="w-full px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
           >
             <div className="flex items-start gap-3">
               {/* 展开指示器 */}
               <motion.div
                 animate={{ rotate: isExpanded ? 90 : 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex-shrink-0 text-[#707070] mt-0.5"
+                className="flex-shrink-0 text-[#707070] mt-1"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-5 h-5" />
               </motion.div>
               
               {/* 类型图标 */}
-              <div className={cn('flex-shrink-0 mt-0.5', getTypeColor(config.type))}>
+              <div className={cn('flex-shrink-0 mt-1', getTypeColor(config.type))}>
                 <ValueTypeIcon type={config.type} />
               </div>
               
               {/* 键名和描述 */}
-              <div className="flex-1 min-w-0 flex flex-col gap-1">
+              <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                 {/* 键名和数量标签 */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={cn(
-                    'font-medium text-sm',
-                    config.depth === 0 ? 'text-white' : 'text-[#a0a0a0]'
+                    'font-semibold text-base',
+                    config.depth === 0 ? 'text-white' : 'text-[#b0b0b0]'
                   )}>
                     {config.key}
                   </span>
                   <Badge 
                     variant="outline" 
                     className={cn(
-                      'text-[10px] px-1.5 py-0 h-4 border-0 font-normal flex-shrink-0',
+                      'text-xs px-2 py-0 h-5 border-0 font-normal flex-shrink-0',
                       getTypeBgColor(config.type),
                       getTypeColor(config.type)
                     )}
@@ -558,11 +558,11 @@ const ConfigItemEditor = ({
                 
                 {/* 描述 - 完整展示，保留换行 */}
                 {descriptionLines.length > 0 && (
-                  <div className="space-y-0.5 mt-0.5">
+                  <div className="space-y-1 mt-1">
                     {descriptionLines.map((line, index) => (
                       <p 
                         key={index} 
-                        className="text-xs text-[#707070] leading-relaxed whitespace-pre-wrap break-words text-left"
+                        className="text-sm text-[#808080] leading-relaxed whitespace-pre-wrap break-words text-left"
                       >
                         {line ? highlightNumbersInText(line) : '\u00A0'}
                       </p>
@@ -584,8 +584,8 @@ const ConfigItemEditor = ({
                 className="overflow-hidden"
               >
                 {/* 子项容器 - 带左边框表示层级 */}
-                <div className="px-3 pb-3">
-                  <div className="pl-3 border-l-2 border-[#2a2a2a] space-y-1">
+                <div className="px-4 pb-4">
+                  <div className="pl-4 border-l-2 border-[#2a2a2a] space-y-2">
                     {childConfigs.map((childConfig) => {
                       // 计算子节点的子配置项
                       const grandChildConfigs = allConfigValues.filter(
@@ -625,36 +625,36 @@ const ConfigItemEditor = ({
   return (
     <div
       className="group"
-      style={{ marginLeft: `${config.depth * 12}px` }}
+      style={{ marginLeft: `${config.depth * 16}px` }}
     >
       <div className={cn(
-        'flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-all duration-200',
+        'flex items-start gap-3 px-4 py-3.5 rounded-lg border transition-all duration-200',
         'hover:border-[#3a3a3a] hover:bg-white/[0.02]',
         getTypeBgColor(config.type)
       )}>
         {/* 左侧占位（保持对齐） */}
-        <div className="w-4 flex-shrink-0 mt-0.5" />
+        <div className="w-5 flex-shrink-0 mt-0.5" />
         
         {/* 类型图标 */}
-        <div className={cn('flex-shrink-0 mt-0.5', getTypeColor(config.type))}>
+        <div className={cn('flex-shrink-0 mt-1', getTypeColor(config.type))}>
           <ValueTypeIcon type={config.type} />
         </div>
         
         {/* 键名、描述和编辑器区域 */}
-        <div className="flex-1 min-w-0 flex flex-col gap-1">
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
           {/* 第一行：键名 + 类型标签 + 编辑器 */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <span className={cn(
-                'font-medium text-sm',
-                config.depth === 0 ? 'text-white' : 'text-[#b0b0b0]'
+                'font-medium text-base',
+                config.depth === 0 ? 'text-white' : 'text-[#c0c0c0]'
               )}>
                 {config.key}
               </span>
               <Badge 
                 variant="outline" 
                 className={cn(
-                  'text-[9px] px-1 py-0 h-3.5 border-0 font-normal opacity-60 flex-shrink-0',
+                  'text-xs px-1.5 py-0 h-4 border-0 font-normal opacity-70 flex-shrink-0',
                   getTypeBgColor(config.type),
                   getTypeColor(config.type)
                 )}
@@ -671,11 +671,11 @@ const ConfigItemEditor = ({
           
           {/* 描述 - 完整展示，保留换行 */}
           {descriptionLines.length > 0 && (
-            <div className="space-y-0.5 mt-0.5">
+            <div className="space-y-1 mt-0.5">
               {descriptionLines.map((line, index) => (
                 <p 
                   key={index} 
-                  className="text-xs text-[#707070] leading-relaxed whitespace-pre-wrap break-words"
+                  className="text-sm text-[#808080] leading-relaxed whitespace-pre-wrap break-words"
                 >
                   {line ? highlightNumbersInText(line) : '\u00A0'}
                 </p>
@@ -1042,7 +1042,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
   };
   
   return (
-    <div className="flex font-mono text-sm leading-6">
+    <div className="flex font-mono text-base leading-7">
       {/* 行号列 */}
       <div 
         className="flex-shrink-0 py-4 text-right select-none border-r border-[#2a2a2a] bg-[#0a0a0a]"
@@ -1051,7 +1051,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
         {lines.map((_, idx) => (
           <div 
             key={idx} 
-            className="px-3 text-gray-600 text-xs leading-6"
+            className="px-3 text-gray-600 text-sm leading-7"
           >
             {idx + 1}
           </div>
@@ -1063,7 +1063,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
         <pre className="py-4">
           <code>
             {lines.map((tokens, lineIdx) => (
-              <div key={lineIdx} className="px-4 min-h-[1.5rem]">
+              <div key={lineIdx} className="px-4 min-h-[1.75rem]">
                 {tokens.length > 0 
                   ? tokens.map((token, tokenIdx) => renderToken(token, tokenIdx))
                   : <span className="text-gray-700">&#9585;</span> // 空行指示
@@ -1540,7 +1540,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
               className="h-full overflow-hidden absolute inset-0"
             >
               <ScrollArea className="h-full w-full" type="always">
-                <div className="p-4 space-y-1">
+                <div className="p-5 space-y-2">
                   {topLevelConfigs.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                       <FileCode className="w-12 h-12 text-[#3a3a3a] mb-4" />
@@ -1560,7 +1560,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                       }}
                       initial="hidden"
                       animate="visible"
-                      className="space-y-1"
+                      className="space-y-2"
                     >
                       {topLevelConfigs.map((config) => {
                         // 获取该配置项的直接子配置项

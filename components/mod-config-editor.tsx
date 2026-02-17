@@ -15,9 +15,9 @@ import {
   Hash,
   ToggleLeft,
   Braces,
-  Info,
   Eye,
   Code,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -85,33 +85,33 @@ const ValueTypeIcon = ({ type }: { type: ConfigValue['type'] }) => {
 const getTypeColor = (type: ConfigValue['type']) => {
   switch (type) {
     case 'string':
-      return 'text-[#00d17a]';
+      return 'text-emerald-400';
     case 'number':
-      return 'text-[#1b8fff]';
+      return 'text-blue-400';
     case 'boolean':
-      return 'text-[#9b59b6]';
+      return 'text-purple-400';
     case 'object':
     case 'array':
-      return 'text-[#e67e22]';
+      return 'text-amber-400';
     default:
-      return 'text-[#707070]';
+      return 'text-gray-500';
   }
 };
 
-// 值类型背景色
+// 值类型背景色（更柔和）
 const getTypeBgColor = (type: ConfigValue['type']) => {
   switch (type) {
     case 'string':
-      return 'bg-[#00d17a]/10 border-[#00d17a]/20';
+      return 'bg-emerald-500/5 border-emerald-500/10';
     case 'number':
-      return 'bg-[#1b8fff]/10 border-[#1b8fff]/20';
+      return 'bg-blue-500/5 border-blue-500/10';
     case 'boolean':
-      return 'bg-[#9b59b6]/10 border-[#9b59b6]/20';
+      return 'bg-purple-500/5 border-purple-500/10';
     case 'object':
     case 'array':
-      return 'bg-[#e67e22]/10 border-[#e67e22]/20';
+      return 'bg-amber-500/5 border-amber-500/10';
     default:
-      return 'bg-[#2a2a2a] border-[#3a3a3a]';
+      return 'bg-[#1a1a1a] border-[#2a2a2a]';
   }
 };
 
@@ -193,7 +193,7 @@ function extractConfigValues(
   return results;
 }
 
-// 配置项编辑器
+// 配置项编辑器 - 优化排版版本
 interface ConfigItemEditorProps {
   config: ConfigValue;
   value: unknown;
@@ -216,6 +216,12 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
     onChange(config.path, newValue);
   };
   
+  const hasChildren = config.type === 'object' || config.type === 'array';
+  const childrenCount = hasChildren 
+    ? (Array.isArray(value) ? (value as unknown[]).length : Object.keys(value as object).length)
+    : 0;
+  
+  // 渲染值编辑器 - 统一的控件样式
   const renderEditor = () => {
     switch (config.type) {
       case 'boolean':
@@ -224,12 +230,12 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
             whileTap={{ scale: 0.95 }}
             onClick={() => handleChange(!localValue)}
             className={cn(
-              'relative w-12 h-6 rounded-full transition-colors duration-200',
-              localValue ? 'bg-[#00d17a]' : 'bg-[#3a3a3a]'
+              'relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0',
+              localValue ? 'bg-emerald-500' : 'bg-[#3a3a3a]'
             )}
           >
             <motion.div
-              className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md"
+              className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm"
               animate={{ 
                 left: localValue ? 'calc(100% - 1.375rem)' : '0.125rem' 
               }}
@@ -240,177 +246,238 @@ const ConfigItemEditor = ({ config, value, onChange, isExpanded, onToggle, child
         
       case 'number':
         return (
-          <input
-            type="text"
-            inputMode="numeric"
-            value={String(localValue ?? '')}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === '' || val === '-') {
-                handleChange(val);
-              } else {
-                const num = Number(val);
-                if (!isNaN(num)) {
+          <div className="relative flex-shrink-0">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={String(localValue ?? '')}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '' || val === '-') {
+                  handleChange(val);
+                } else {
+                  const num = Number(val);
+                  if (!isNaN(num)) {
+                    handleChange(num);
+                  }
+                }
+              }}
+              onFocus={() => setIsEditing(true)}
+              onBlur={() => {
+                setIsEditing(false);
+                const num = Number(localValue);
+                if (!isNaN(num) && localValue !== '') {
                   handleChange(num);
                 }
-              }
-            }}
-            onFocus={() => setIsEditing(true)}
-            onBlur={() => {
-              setIsEditing(false);
-              // 确保最终保存为数字
-              const num = Number(localValue);
-              if (!isNaN(num) && localValue !== '') {
-                handleChange(num);
-              }
-            }}
-            className={cn(
-              'px-3 py-1.5 rounded-md bg-[#1a1a1a] border text-sm font-mono w-32',
-              'focus:outline-none focus:ring-2 focus:ring-[#00d17a]/50',
-              'transition-all duration-200',
-              isEditing ? 'border-[#00d17a] text-white' : 'border-[#3a3a3a] text-[#1b8fff]'
-            )}
-          />
+              }}
+              className={cn(
+                'px-3 py-1.5 rounded-md bg-[#141414] border text-sm font-mono w-28 h-8',
+                'focus:outline-none focus:ring-2 focus:ring-emerald-500/40',
+                'transition-all duration-200 text-right',
+                isEditing ? 'border-emerald-500 text-white' : 'border-[#2a2a2a] text-blue-400'
+              )}
+            />
+          </div>
         );
         
       case 'string':
         return (
-          <input
-            type="text"
-            value={String(localValue ?? '')}
-            onChange={(e) => handleChange(e.target.value)}
-            onFocus={() => setIsEditing(true)}
-            onBlur={() => setIsEditing(false)}
-            className={cn(
-              'px-3 py-1.5 rounded-md bg-[#1a1a1a] border text-sm flex-1 min-w-0',
-              'focus:outline-none focus:ring-2 focus:ring-[#00d17a]/50',
-              'transition-all duration-200',
-              isEditing ? 'border-[#00d17a] text-white' : 'border-[#3a3a3a] text-[#00d17a]'
-            )}
-          />
+          <div className="relative flex-1 min-w-0 max-w-md">
+            <input
+              type="text"
+              value={String(localValue ?? '')}
+              onChange={(e) => handleChange(e.target.value)}
+              onFocus={() => setIsEditing(true)}
+              onBlur={() => setIsEditing(false)}
+              className={cn(
+                'w-full px-3 py-1.5 rounded-md bg-[#141414] border text-sm h-8',
+                'focus:outline-none focus:ring-2 focus:ring-emerald-500/40',
+                'transition-all duration-200',
+                isEditing ? 'border-emerald-500 text-white' : 'border-[#2a2a2a] text-emerald-400'
+              )}
+            />
+          </div>
         );
         
       default:
         return (
-          <span className="text-[#707070] text-sm italic">
-            {Array.isArray(localValue) ? `[${(localValue as unknown[]).length} items]` : 
-             typeof localValue === 'object' ? '{...}' : 
+          <span className="text-[#707070] text-sm italic px-3 py-1.5">
+            {Array.isArray(localValue) ? `[${(localValue as unknown[]).length} 项]` : 
+             typeof localValue === 'object' ? `{${Object.keys(localValue || {}).length} 个键}` : 
              String(localValue)}
           </span>
         );
     }
   };
   
-  const hasChildren = config.type === 'object' || config.type === 'array';
+  // 渲染对象/数组的展开头部
+  if (hasChildren) {
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -4 }}
+        transition={{ duration: 0.15 }}
+        className="group"
+        style={{ marginLeft: `${config.depth * 12}px` }}
+      >
+        {/* 父级项 - 卡片样式 */}
+        <div 
+          className={cn(
+            'rounded-lg border transition-all duration-200 overflow-hidden',
+            getTypeBgColor(config.type),
+            isExpanded ? 'border-opacity-50 shadow-lg shadow-black/20' : 'hover:border-opacity-30'
+          )}
+        >
+          {/* 头部 - 可点击展开 */}
+          <button
+            onClick={onToggle}
+            className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-white/[0.02] transition-colors"
+          >
+            {/* 展开指示器 */}
+            <motion.div
+              animate={{ rotate: isExpanded ? 90 : 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex-shrink-0 text-[#707070]"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </motion.div>
+            
+            {/* 类型图标 */}
+            <div className={cn('flex-shrink-0', getTypeColor(config.type))}>
+              <ValueTypeIcon type={config.type} />
+            </div>
+            
+            {/* 键名 */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  'font-medium text-sm',
+                  config.depth === 0 ? 'text-white' : 'text-[#a0a0a0]'
+                )}>
+                  {config.key}
+                </span>
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    'text-[10px] px-1.5 py-0 h-4 border-0 font-normal',
+                    getTypeBgColor(config.type),
+                    getTypeColor(config.type)
+                  )}
+                >
+                  {childrenCount} 项
+                </Badge>
+              </div>
+              
+              {/* 描述 */}
+              {config.description && (
+                <p className="text-xs text-[#707070] mt-0.5 leading-relaxed line-clamp-1">
+                  {config.description}
+                </p>
+              )}
+            </div>
+          </button>
+          
+          {/* 子项展开区域 */}
+          <AnimatePresence>
+            {isExpanded && childConfigs.length > 0 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2, ease: easings.standard }}
+                className="overflow-hidden"
+              >
+                {/* 子项容器 - 带左边框表示层级 */}
+                <div className="px-3 pb-3">
+                  <div className="pl-3 border-l-2 border-[#2a2a2a] space-y-1">
+                    {childConfigs.map((childConfig) => (
+                      <ConfigItemEditor
+                        key={childConfig.path}
+                        config={childConfig}
+                        value={childConfig.value}
+                        onChange={onChange}
+                        isExpanded={false}
+                        onToggle={() => {}}
+                        childConfigs={[]}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    );
+  }
   
+  // 渲染叶节点（基本类型）- 表格行样式
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
-      transition={{ duration: 0.2, ease: easings.spring }}
-      className={cn(
-        'group rounded-lg border transition-all duration-200',
-        'hover:border-[#4a4a4a] hover:shadow-lg hover:shadow-black/20',
-        getTypeBgColor(config.type)
-      )}
-      style={{ marginLeft: `${config.depth * 16}px` }}
+      transition={{ duration: 0.15 }}
+      className="group"
+      style={{ marginLeft: `${config.depth * 12}px` }}
     >
-      <div className="p-3">
-        <div className="flex items-start gap-3">
-          {/* 展开/折叠按钮（仅对象/数组） */}
-          {hasChildren ? (
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={onToggle}
-              className="mt-0.5 p-0.5 rounded hover:bg-white/10 text-[#707070] hover:text-white transition-colors"
+      <div className={cn(
+        'flex items-center gap-3 px-3 py-2 rounded-lg border transition-all duration-200',
+        'hover:border-[#3a3a3a] hover:bg-white/[0.02]',
+        getTypeBgColor(config.type)
+      )}>
+        {/* 左侧占位（保持对齐） */}
+        <div className="w-4 flex-shrink-0" />
+        
+        {/* 类型图标 */}
+        <div className={cn('flex-shrink-0', getTypeColor(config.type))}>
+          <ValueTypeIcon type={config.type} />
+        </div>
+        
+        {/* 键名和描述区域 */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              'font-medium text-sm',
+              config.depth === 0 ? 'text-white' : 'text-[#b0b0b0]'
+            )}>
+              {config.key}
+            </span>
+            <Badge 
+              variant="outline" 
+              className={cn(
+                'text-[9px] px-1 py-0 h-3.5 border-0 font-normal opacity-60',
+                getTypeBgColor(config.type),
+                getTypeColor(config.type)
+              )}
             >
-              <motion.div
-                animate={{ rotate: isExpanded ? 90 : 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </motion.div>
-            </motion.button>
-          ) : (
-            <div className="w-5" />
+              {config.type}
+            </Badge>
+          </div>
+          
+          {/* 描述 */}
+          {config.description && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p className="text-xs text-[#707070] leading-snug mt-0.5 line-clamp-1 cursor-help">
+                  {config.description}
+                </p>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-sm">
+                <p className="text-xs">{config.description}</p>
+              </TooltipContent>
+            </Tooltip>
           )}
-          
-          {/* 类型图标 */}
-          <div className={cn('mt-0.5', getTypeColor(config.type))}>
-            <ValueTypeIcon type={config.type} />
-          </div>
-          
-          {/* 键名 */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={cn(
-                'font-medium text-sm',
-                config.depth === 0 ? 'text-white' : 'text-[#a0a0a0]'
-              )}>
-                {config.key}
-              </span>
-              
-              {/* 类型标签 */}
-              <Badge 
-                variant="outline" 
-                className={cn(
-                  'text-[10px] px-1.5 py-0 h-4 border-0',
-                  getTypeBgColor(config.type),
-                  getTypeColor(config.type)
-                )}
-              >
-                {config.type}
-              </Badge>
-            </div>
-            
-            {/* 描述 */}
-            {config.description && (
-              <motion.p 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-xs text-[#707070] mt-1 leading-relaxed"
-              >
-                <Info className="w-3 h-3 inline mr-1 opacity-50" />
-                {config.description}
-              </motion.p>
-            )}
-          </div>
-          
-          {/* 值编辑器 */}
-          <div className="flex-shrink-0">
-            {renderEditor()}
-          </div>
+        </div>
+        
+        {/* 值编辑器区域 */}
+        <div className="flex-shrink-0 flex items-center">
+          {renderEditor()}
         </div>
       </div>
-      
-      {/* 子配置项（仅 object/array 且展开时显示） */}
-      <AnimatePresence>
-        {hasChildren && isExpanded && childConfigs.length > 0 && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: easings.standard }}
-            className="overflow-hidden"
-          >
-            <div className="pt-2 pb-1 space-y-2">
-              {childConfigs.map((childConfig) => (
-                <ConfigItemEditor
-                  key={childConfig.path}
-                  config={childConfig}
-                  value={childConfig.value}
-                  onChange={onChange}
-                  isExpanded={false}
-                  onToggle={() => {}}
-                  childConfigs={[]}
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 };
@@ -445,7 +512,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
         if (sectionMatch) {
           tokens.push(
             <span key={keyCounter++}>{escapeHtml(sectionMatch[1])}</span>,
-            <span key={keyCounter++} className="text-[#e67e22]">{escapeHtml(sectionMatch[2] + sectionMatch[3] + sectionMatch[4])}</span>,
+            <span key={keyCounter++} className="text-amber-400">{escapeHtml(sectionMatch[2] + sectionMatch[3] + sectionMatch[4])}</span>,
             <span key={keyCounter++}>{escapeHtml(sectionMatch[5])}</span>
           );
           remaining = '';
@@ -460,7 +527,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
         const strMatch = remaining.match(/^([^"]*)"([^"]*)"(.*)$/);
         if (strMatch) {
           if (strMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(strMatch[1])}</span>);
-          tokens.push(<span key={keyCounter++} className="text-[#00d17a]">{escapeHtml('"' + strMatch[2] + '"')}</span>);
+          tokens.push(<span key={keyCounter++} className="text-emerald-400">{escapeHtml('"' + strMatch[2] + '"')}</span>);
           remaining = strMatch[3];
           matched = true;
           continue;
@@ -470,7 +537,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
         const strSingleMatch = remaining.match(/^([^']*)'([^']*)'(.*)$/);
         if (strSingleMatch) {
           if (strSingleMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(strSingleMatch[1])}</span>);
-          tokens.push(<span key={keyCounter++} className="text-[#00d17a]">{escapeHtml("'" + strSingleMatch[2] + "'")}</span>);
+          tokens.push(<span key={keyCounter++} className="text-emerald-400">{escapeHtml("'" + strSingleMatch[2] + "'")}</span>);
           remaining = strSingleMatch[3];
           matched = true;
           continue;
@@ -483,7 +550,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
           const nextChar = numMatch[3].charAt(0);
           if (nextChar !== '=' && nextChar !== ':') {
             if (numMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(numMatch[1])}</span>);
-            tokens.push(<span key={keyCounter++} className="text-[#1b8fff]">{escapeHtml(numMatch[2])}</span>);
+            tokens.push(<span key={keyCounter++} className="text-blue-400">{escapeHtml(numMatch[2])}</span>);
             remaining = numMatch[3];
             matched = true;
             continue;
@@ -494,7 +561,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
         const boolMatch = remaining.match(/^(.*?)(\b(?:true|false)\b)(.*)$/i);
         if (boolMatch) {
           if (boolMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(boolMatch[1])}</span>);
-          tokens.push(<span key={keyCounter++} className="text-[#9b59b6]">{escapeHtml(boolMatch[2])}</span>);
+          tokens.push(<span key={keyCounter++} className="text-purple-400">{escapeHtml(boolMatch[2])}</span>);
           remaining = boolMatch[3];
           matched = true;
           continue;
@@ -504,7 +571,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
         const nullMatch = remaining.match(/^(.*?)(\bnull\b)(.*)$/);
         if (nullMatch) {
           if (nullMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(nullMatch[1])}</span>);
-          tokens.push(<span key={keyCounter++} className="text-[#707070]">{escapeHtml(nullMatch[2])}</span>);
+          tokens.push(<span key={keyCounter++} className="text-gray-500">{escapeHtml(nullMatch[2])}</span>);
           remaining = nullMatch[3];
           matched = true;
           continue;
@@ -515,7 +582,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
           const commentMatch = remaining.match(/^(.*?)(#|\/\/)(.*)$/);
           if (commentMatch) {
             if (commentMatch[1]) tokens.push(<span key={keyCounter++}>{escapeHtml(commentMatch[1])}</span>);
-            tokens.push(<span key={keyCounter++} className="text-[#707070] italic">{escapeHtml(commentMatch[2] + commentMatch[3])}</span>);
+            tokens.push(<span key={keyCounter++} className="text-gray-600 italic">{escapeHtml(commentMatch[2] + commentMatch[3])}</span>);
             remaining = '';
             matched = true;
             continue;
@@ -710,6 +777,25 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     setHasChanges(false);
   };
   
+  // 展开/折叠全部
+  const expandAll = useCallback(() => {
+    const allPaths = new Set<string>();
+    const collectPaths = (obj: unknown, path: string = '') => {
+      if (typeof obj === 'object' && obj !== null) {
+        allPaths.add(path);
+        for (const key of Object.keys(obj)) {
+          collectPaths((obj as Record<string, unknown>)[key], path ? `${path}.${key}` : key);
+        }
+      }
+    };
+    collectPaths(parsed);
+    setExpandedPaths(allPaths);
+  }, [parsed]);
+  
+  const collapseAll = useCallback(() => {
+    setExpandedPaths(new Set());
+  }, []);
+  
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -717,7 +803,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
           animate={{ rotate: 360 }}
           transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
         >
-          <FileCode className="w-8 h-8 text-[#00d17a]" />
+          <FileCode className="w-8 h-8 text-emerald-500" />
         </motion.div>
       </div>
     );
@@ -730,14 +816,14 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         animate={{ opacity: 1, scale: 1 }}
         className="flex flex-col items-center justify-center h-64 text-center p-6"
       >
-        <AlertCircle className="w-12 h-12 text-[#e74c3c] mb-4" />
+        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
         <h3 className="text-lg font-medium text-white mb-2">加载失败</h3>
         <p className="text-sm text-[#707070]">{error}</p>
         <Button
           variant="outline"
           size="sm"
           onClick={loadFile}
-          className="mt-4 border-[#3a3a3a] text-[#a0a0a0] hover:text-white"
+          className="mt-4 border-[#2a2a2a] text-[#a0a0a0] hover:text-white"
         >
           <RotateCcw className="w-4 h-4 mr-2" />
           重试
@@ -757,16 +843,52 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         {/* 工具栏 */}
         <div className="flex items-center justify-between p-4 border-b border-[#2a2a2a] bg-[#151515]/50">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[#00d17a]/10">
-              <FileTypeIcon type={fileType} className="w-5 h-5 text-[#00d17a]" />
+            <div className="p-2 rounded-lg bg-emerald-500/10">
+              <FileTypeIcon type={fileType} className="w-5 h-5 text-emerald-500" />
             </div>
-            <div>
-              <h3 className="font-medium text-white text-sm">{filePath}</h3>
+            <div className="min-w-0">
+              <h3 className="font-medium text-white text-sm truncate">{filePath}</h3>
               <p className="text-xs text-[#707070]">{modName}</p>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
+            {/* 展开/折叠控制（仅在表单模式下显示） */}
+            {viewMode === 'form' && (
+              <div className="hidden sm:flex items-center gap-1 mr-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={expandAll}
+                      className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a]"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>展开全部</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={collapseAll}
+                      className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a]"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>折叠全部</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )}
+            
             {/* 视图切换 */}
             <div className="flex bg-[#1a1a1a] rounded-lg p-0.5 border border-[#2a2a2a]">
               <Tooltip>
@@ -822,7 +944,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00d17a]/10 text-[#00d17a]"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500"
                 >
                   <Check className="w-4 h-4" />
                   <span className="text-xs font-medium">已保存</span>
@@ -833,9 +955,9 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#e67e22]/10 text-[#e67e22]"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500"
                 >
-                  <div className="w-2 h-2 rounded-full bg-[#e67e22] animate-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   <span className="text-xs font-medium">未保存</span>
                 </motion.div>
               ) : null}
@@ -868,7 +990,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   onClick={handleSave}
                   disabled={saving || !hasChanges}
                   className={cn(
-                    'h-8 px-3 bg-[#00d17a] hover:bg-[#00b86b] text-black font-medium',
+                    'h-8 px-3 bg-emerald-500 hover:bg-emerald-600 text-black font-medium',
                     'disabled:opacity-50 disabled:cursor-not-allowed'
                   )}
                 >
@@ -905,7 +1027,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                 className="h-full overflow-hidden absolute inset-0"
               >
                 <ScrollArea className="h-full w-full" type="always">
-                  <div className="p-4 space-y-3">
+                  <div className="p-4 space-y-1">
                     {topLevelConfigs.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center">
                         <FileCode className="w-12 h-12 text-[#3a3a3a] mb-4" />
@@ -916,7 +1038,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                         variants={staggerContainer}
                         initial="hidden"
                         animate="visible"
-                        className="space-y-3"
+                        className="space-y-1"
                       >
                         {topLevelConfigs.map((config) => {
                           // 获取该配置项的直接子配置项

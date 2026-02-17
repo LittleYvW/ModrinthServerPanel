@@ -117,13 +117,29 @@ const getTypeBgColor = (type: ConfigValue['type']) => {
 function extractDescription(content: string, key: string): string | undefined {
   const lines = content.split('\n');
   
+  // 构建精确匹配模式
+  // 支持格式：
+  // - JSON: "key": 或 "key" :
+  // - JSON5: 'key': 或 key: 或 'key' : 或 key :
+  // - TOML: key = 或 [key] 或 [[key]]
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const keyPattern = new RegExp(
+    `^\\s*(?:` +
+    `(?:"${escapedKey}")` +              // "key"
+    `|(?:'${escapedKey}')` +              // 'key'
+    `|(?:${escapedKey})` +                // key (bare key)
+    `)\\s*[:=]|` +                        // 后跟 : 或 =
+    `^\\s*\\[\\[?\\s*${escapedKey}\\s*\\]\\]?`  // [key] 或 [[key]]
+  );
+  
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // 查找包含该键的行
-    if (line.includes(`"${key}"`) || line.includes(`${key}:`) || line.includes(`${key} =`)) {
+    
+    // 使用正则表达式精确匹配键定义行
+    if (keyPattern.test(line)) {
       // 向前查找注释（保留原始格式）
       const descriptionLines: string[] = [];
-      for (let j = Math.max(0, i - 10); j < i; j++) {
+      for (let j = Math.max(0, i - 15); j < i; j++) {
         const prevLine = lines[j];
         const trimmedLine = prevLine.trim();
         // JSON/JSON5/TOML 风格的注释
@@ -139,14 +155,16 @@ function extractDescription(content: string, key: string): string | undefined {
             descriptionLines.push(comment);
           }
         } else if (trimmedLine === '' && descriptionLines.length > 0) {
-          // 空行表示注释块结束，保留为换行
+          // 空行表示注释块结束
           break;
         }
       }
       if (descriptionLines.length > 0) {
-        // 保留换行，使用特殊分隔符，渲染时再处理
+        // 保留换行
         return descriptionLines.join('\n');
       }
+      
+      // 找到键但没有注释，继续查找下一个匹配（处理同名键的情况）
     }
   }
   

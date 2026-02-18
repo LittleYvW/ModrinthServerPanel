@@ -109,6 +109,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
   const [scanResults, setScanResults] = useState<Array<{ modId: string; modName: string; files: Array<{ path: string; type: string }> }> | null>(null);
   const [showScanResults, setShowScanResults] = useState(false);
   const [scanAnimationKey, setScanAnimationKey] = useState(0);
+  const [linkingFiles, setLinkingFiles] = useState<Set<string>>(new Set());
   
   // 加载已关联的文件
   const loadLinkedFiles = useCallback(async () => {
@@ -200,28 +201,41 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
   
   // 手动关联文件
   const handleLinkFile = async (file: AvailableFile) => {
-    try {
-      const res = await fetch('/api/mod-configs', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modId,
-          modName,
-          file: {
-            path: file.path,
-            type: file.type,
-            autoDetected: false,
-          },
-        }),
-      });
-      
-      if (res.ok) {
-        await loadLinkedFiles();
-        setActiveTab('linked');
+    // 先添加向左滑出动画
+    setLinkingFiles(prev => new Set(prev).add(file.path));
+    
+    // 等待动画完成后再执行关联
+    setTimeout(async () => {
+      try {
+        const res = await fetch('/api/mod-configs', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modId,
+            modName,
+            file: {
+              path: file.path,
+              type: file.type,
+              autoDetected: false,
+            },
+          }),
+        });
+        
+        if (res.ok) {
+          await loadLinkedFiles();
+          // 关联成功后保持在当前标签页，不自动切换
+        }
+      } catch (err) {
+        console.error('Failed to link file:', err);
+      } finally {
+        // 从动画集合中移除
+        setLinkingFiles(prev => {
+          const next = new Set(prev);
+          next.delete(file.path);
+          return next;
+        });
       }
-    } catch (err) {
-      console.error('Failed to link file:', err);
-    }
+    }, 300); // 动画持续时间
   };
   
   // 取消关联文件
@@ -636,6 +650,14 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
                           key={file.path}
                           variants={listItem}
                           layout
+                          animate={{
+                            x: linkingFiles.has(file.path) ? -400 : 0,
+                            opacity: linkingFiles.has(file.path) ? 0 : 1,
+                          }}
+                          transition={{
+                            x: { type: 'spring', stiffness: 300, damping: 25 },
+                            opacity: { duration: 0.2 },
+                          }}
                           className="group flex items-center gap-3 p-3 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#00d17a]/50 transition-colors"
                         >
                           <div className={cn(

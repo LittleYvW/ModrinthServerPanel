@@ -111,6 +111,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
   const [showScanResults, setShowScanResults] = useState(false);
   const [scanAnimationKey, setScanAnimationKey] = useState(0);
   const [linkingFiles, setLinkingFiles] = useState<Set<string>>(new Set());
+  const [unlinkingFiles, setUnlinkingFiles] = useState<Set<string>>(new Set());
   
   // 加载已关联的文件
   const loadLinkedFiles = useCallback(async () => {
@@ -241,20 +242,33 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
   
   // 取消关联文件
   const handleUnlinkFile = async (filePath: string) => {
-    try {
-      const res = await fetch(`/api/mod-configs?modId=${encodeURIComponent(modId)}&filePath=${encodeURIComponent(filePath)}`, {
-        method: 'DELETE',
-      });
-      
-      if (res.ok) {
-        await loadLinkedFiles();
-        if (selectedFile?.path === filePath) {
-          setSelectedFile(null);
+    // 先添加向右滑出动画
+    setUnlinkingFiles(prev => new Set(prev).add(filePath));
+    
+    // 等待动画完成后再执行取消关联
+    setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/mod-configs?modId=${encodeURIComponent(modId)}&filePath=${encodeURIComponent(filePath)}`, {
+          method: 'DELETE',
+        });
+        
+        if (res.ok) {
+          await loadLinkedFiles();
+          if (selectedFile?.path === filePath) {
+            setSelectedFile(null);
+          }
         }
+      } catch (err) {
+        console.error('Failed to unlink file:', err);
+      } finally {
+        // 从动画集合中移除
+        setUnlinkingFiles(prev => {
+          const next = new Set(prev);
+          next.delete(filePath);
+          return next;
+        });
       }
-    } catch (err) {
-      console.error('Failed to unlink file:', err);
-    }
+    }, 300); // 动画持续时间
   };
   
   // 过滤可用文件
@@ -554,12 +568,15 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
                         <motion.div
                           key={file.path}
                           initial={{ opacity: 0, x: 80 }}
-                          animate={{ opacity: 1, x: 0 }}
+                          animate={{
+                            opacity: unlinkingFiles.has(file.path) ? 0 : 1,
+                            x: unlinkingFiles.has(file.path) ? 400 : 0,
+                          }}
                           transition={{
                             type: 'spring',
                             stiffness: 300,
                             damping: 25,
-                            delay: index * 0.06,
+                            delay: unlinkingFiles.has(file.path) ? 0 : index * 0.06,
                           }}
                           className={cn(
                             "group flex items-center gap-3 p-3 rounded-lg border",

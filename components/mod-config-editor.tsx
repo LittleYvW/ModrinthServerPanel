@@ -30,6 +30,7 @@ import {
   fadeIn, 
   easings,
   arrayItemEnter,
+  springScale,
 } from '@/lib/animations';
 
 // 配置值类型
@@ -396,6 +397,7 @@ interface ConfigItemEditorProps {
   toggleExpanded?: (path: string) => void;
   allConfigValues?: ConfigValue[];
   isArrayItem?: boolean;
+  isLastArrayItem?: boolean;
 }
 
 const ConfigItemEditor = ({ 
@@ -409,7 +411,8 @@ const ConfigItemEditor = ({
   expandedPaths = new Set(),
   toggleExpanded = () => {},
   allConfigValues = [],
-  isArrayItem = false
+  isArrayItem = false,
+  isLastArrayItem = false
 }: ConfigItemEditorProps) => {
   const [localValue, setLocalValue] = useState(value);
   const [isEditing, setIsEditing] = useState(false);
@@ -649,6 +652,11 @@ const ConfigItemEditor = ({
                         const isArray = config.type === 'array';
                         
                         // 计算编辑器元素
+                        // 提取数组索引以判断是否为最后一项
+                        const arrayIndexMatch = childConfig.path.match(/\[(\d+)\]$/);
+                        const arrayIndex = arrayIndexMatch ? parseInt(arrayIndexMatch[1], 10) : -1;
+                        const isLastItem = isArray && arrayIndex === childrenCount - 1;
+                        
                         const editorProps = {
                           config: childConfig,
                           value: childConfig.value,
@@ -661,6 +669,7 @@ const ConfigItemEditor = ({
                           toggleExpanded,
                           allConfigValues,
                           isArrayItem: isArray,
+                          isLastArrayItem: isLastItem,
                         };
                         
                         // 只为数组类型的子项添加动画
@@ -764,12 +773,13 @@ const ConfigItemEditor = ({
               {renderEditor()}
             </div>
             
-            {/* 数组元素删除按钮 */}
+            {/* 数组元素删除按钮 - 只有最后一项可以删除，其他项保留占位以保持对齐 */}
             {isArrayItem && onArrayChange && (
               <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: isLastArrayItem ? 1.1 : 1 }}
+                whileTap={{ scale: isLastArrayItem ? 0.9 : 1 }}
                 onClick={() => {
+                  if (!isLastArrayItem) return;
                   // 从路径中提取索引，如 "parent[0]" -> 0
                   const match = config.path.match(/\[(\d+)\]$/);
                   if (match) {
@@ -777,11 +787,22 @@ const ConfigItemEditor = ({
                     onArrayChange(parentPath, 'remove', parseInt(match[1], 10));
                   }
                 }}
-                className="p-1.5 rounded-md text-[#707070] hover:text-red-400 hover:bg-red-500/10 
-                           transition-colors duration-200 flex-shrink-0"
-                title="删除此项"
+                className={cn(
+                  'p-1.5 rounded-md flex-shrink-0',
+                  isLastArrayItem 
+                    ? 'text-[#707070] hover:text-red-400 hover:bg-red-500/10 transition-colors duration-200' 
+                    : 'pointer-events-none bg-transparent'
+                )}
+                title={isLastArrayItem ? "删除此项" : undefined}
               >
-                <Trash2 className="w-4 h-4" />
+                <motion.span
+                  initial={isLastArrayItem ? { opacity: 0, scale: 0.5 } : false}
+                  animate={isLastArrayItem ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.5 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+                  className="flex items-center justify-center"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </motion.span>
               </motion.button>
             )}
           </div>

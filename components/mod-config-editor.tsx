@@ -621,7 +621,7 @@ const ConfigItemEditor = ({
               >
                 {/* 子项容器 - 带左边框表示层级 */}
                 <div className="px-4 pb-4">
-                  <div className="relative pl-4 border-l-2 border-[#2a2a2a] space-y-2">
+                  <div className="relative pl-4 border-l-2 border-[#2a2a2a]">
                     <AnimatePresence initial={false}>
                       {childConfigs.map((childConfig) => {
                         // 计算子节点的子配置项
@@ -668,19 +668,22 @@ const ConfigItemEditor = ({
                           return (
                             <motion.div
                               key={childConfig.path}
-                              layout
                               variants={arrayItemEnter}
                               initial="hidden"
                               animate="visible"
                               exit="exit"
-                              className="will-change-transform"
+                              className="will-change-transform overflow-hidden"
                             >
                               <ConfigItemEditor {...editorProps} />
                             </motion.div>
                           );
                         }
                         
-                        return <ConfigItemEditor key={childConfig.path} {...editorProps} />;
+                        return (
+                          <div key={childConfig.path} className="mb-2">
+                            <ConfigItemEditor {...editorProps} />
+                          </div>
+                        );
                       })}
                     </AnimatePresence>
                     
@@ -695,7 +698,7 @@ const ConfigItemEditor = ({
                         className="w-full py-2.5 px-4 rounded-lg border border-dashed border-[#3a3a3a] 
                                    text-[#707070] hover:text-emerald-400 hover:border-emerald-500/30 
                                    hover:bg-emerald-500/5 transition-colors duration-200
-                                   flex items-center justify-center gap-2 text-sm"
+                                   flex items-center justify-center gap-2 text-sm mt-2"
                       >
                         <Plus className="w-4 h-4" />
                         <span>添加项</span>

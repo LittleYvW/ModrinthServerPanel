@@ -567,17 +567,19 @@ export const dataFlow = {
 };
 
 // ===== 数组项增删动画 =====
-// 向下滑入的入场动画，向左滑出的出场动画
+// 向下滑入的入场动画（不影响布局），向左滑出的出场动画
 export const arrayItemEnter: Variants = {
   hidden: { 
     opacity: 0, 
-    y: -20,
-    scale: 0.98,
+    scale: 0.95,
+    height: 0,
+    marginBottom: 0,
   },
   visible: { 
     opacity: 1, 
-    y: 0,
     scale: 1,
+    height: 'auto',
+    marginBottom: 8, // space-y-2 = 8px
     transition: { 
       duration: 0.3, 
       ease: easings.spring,
@@ -585,11 +587,9 @@ export const arrayItemEnter: Variants = {
   },
   exit: {
     opacity: 0,
-    x: '-100%',
-    position: 'absolute',
-    width: '100%',
+    x: -50,
     transition: { 
-      duration: 0.25, 
+      duration: 0.2, 
       ease: easings.exit,
     },
   },

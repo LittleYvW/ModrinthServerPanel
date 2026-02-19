@@ -71,7 +71,10 @@ export async function getProjectVersions(
     const response = await api.get(`/project/${projectId}/version`, { params });
     console.log('[Modrinth] API response status:', response.status);
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string; response?: { status?: number; statusText?: string; data?: unknown }; config?: { url?: string; params?: unknown } };
+    // Log error details for debugging
+    console.error('[Modrinth] API error:', err.message, err.code);
     console.error('[Modrinth] API error:', {
       message: error.message,
       code: error.code,
@@ -92,7 +95,7 @@ export async function getVersion(versionId: string) {
 }
 
 // 分析环境类型（支持 version 或 project 对象）
-export function analyzeEnvironment(data: any): {
+export function analyzeEnvironment(data: { client_support?: string; server_support?: string; client_side?: string; server_side?: string }): {
   client: 'required' | 'optional' | 'unsupported';
   server: 'required' | 'optional' | 'unsupported';
   category: 'both' | 'server-only' | 'client-only';

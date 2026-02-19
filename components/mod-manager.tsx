@@ -13,15 +13,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { Package, Trash2, Users, Server, Monitor, RefreshCw, Loader2, ExternalLink, Settings2, Check, Power, PowerOff, Star, StarOff, Download, ArrowUpCircle, Sparkles, X, Cog } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { 
   fadeIn, 
   staggerContainer, 
   listItem, 
-  springScale,
-  cardHover,
+
   dropdownMenu 
 } from '@/lib/animations';
 import { useDownloadQueue } from '@/lib/download-queue';
@@ -691,7 +690,7 @@ export function ModManager() {
   const [animationKey, setAnimationKey] = useState(0);
   
   // 下载队列
-  const { addTask, completedTasks, tasks } = useDownloadQueue();
+  const { addTask, completedTasks } = useDownloadQueue();
   
   // 更新分析器状态
   const [isUpdateAnalyzerOpen, setIsUpdateAnalyzerOpen] = useState(false);

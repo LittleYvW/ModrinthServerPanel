@@ -26,14 +26,12 @@ import {
   Trash2,
   RotateCcw,
   ChevronDown,
-  ChevronUp,
+
   Package,
   Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { 
-  springScale 
-} from '@/lib/animations';
+
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString('zh-CN', {
@@ -116,7 +114,7 @@ function TaskItem({ task, onRemove, onRetry }: {
   onRemove: () => void;
   onRetry: () => void;
 }) {
-  const [expanded] = useState(false);
+  useState(false);
 
   return (
     <motion.div

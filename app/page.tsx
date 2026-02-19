@@ -4,14 +4,14 @@ import { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+
 import { Download, Loader2 } from 'lucide-react';
 import { VisitorView } from '@/components/visitor-view';
 import { AdminView } from '@/components/admin-view';
 import { LoginDialog } from '@/components/login-dialog';
 import { DownloadPanel } from '@/components/download-panel';
 import { useDownloadQueue } from '@/lib/download-queue';
-import { Shield, User, Github, ExternalLink } from 'lucide-react';
+import { Shield, User, ExternalLink } from 'lucide-react';
 
 export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);

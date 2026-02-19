@@ -28,9 +28,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils';
 import { 
   fadeIn, 
-  easings,
   arrayItemEnter,
-  springScale,
+  easings,
 } from '@/lib/animations';
 
 // 配置值类型
@@ -844,9 +843,7 @@ interface Token {
   value: string;
 }
 
-// 转义 HTML 特殊字符
-const escapeHtml = (str: string): string => 
-  str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 
 // 词法分析器 - 将行文本解析为 token 数组
 const tokenizeLine = (line: string, fileType: 'json' | 'json5' | 'toml'): Token[] => {
@@ -1093,7 +1090,7 @@ const tokenizeLine = (line: string, fileType: 'json' | 'json5' | 'toml'): Token[
 };
 
 // 后处理：标记 JSON 中作为键的字符串
-const postProcessTokens = (tokens: Token[], fileType: 'json' | 'json5' | 'toml'): Token[] => {
+const postProcessTokens = (tokens: Token[]): Token[] => {
   const result: Token[] = [];
   
   for (let i = 0; i < tokens.length; i++) {
@@ -1218,6 +1215,8 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
 
 // 主编辑器组件
 export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, onSave }: ModConfigEditorProps) {
+  // onClose is kept for API compatibility
+  void onClose;
   const [content, setContent] = useState<string>('');
   const [parsed, setParsed] = useState<unknown>(null);
   const [originalContent, setOriginalContent] = useState<string>('');

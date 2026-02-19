@@ -48,9 +48,10 @@ async function fetchVersionsWithRetry(
     try {
       const versions = await getProjectVersions(projectId) as ModrinthVersion[];
       return versions || [];
-    } catch (error: any) {
-      const status = error?.response?.status;
-      const isRetryable = status === 502 || status === 429 || status === 503 || error?.code === 'ECONNRESET';
+    } catch (error: unknown) {
+      const err = error as { response?: { status?: number }; code?: string };
+      const status = err?.response?.status;
+      const isRetryable = status === 502 || status === 429 || status === 503 || err?.code === 'ECONNRESET';
       
       if (isRetryable && attempt < retries) {
         const waitTime = RETRY_DELAY * attempt; // 指数退避

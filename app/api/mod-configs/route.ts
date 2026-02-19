@@ -6,7 +6,6 @@ import {
   removeModConfig,
   addModConfigFile,
   removeModConfigFile,
-  getMods,
 } from '@/lib/db';
 
 // 获取所有模组配置关联

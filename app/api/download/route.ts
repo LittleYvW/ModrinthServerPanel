@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         'Content-Disposition': `attachment; filename="${mod.filename}"`,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to download file' },
       { status: 500 }
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 }
 
 // 批量下载 - 返回所有双端模组的打包
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const config = getConfig();
     if (!config.path) {
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         downloadUrl: `/api/download?modId=${m.id}`,
       }))
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to get download list' },
       { status: 500 }

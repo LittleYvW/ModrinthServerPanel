@@ -12,24 +12,18 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Shield,
   ShieldCheck,
   ShieldAlert,
   ShieldX,
   Package,
   Check,
   RefreshCw,
-  AlertTriangle,
   Info,
   Loader2,
   ListPlus,
-  ExternalLink,
   ChevronRight,
-  Layers,
   Ban,
-  HelpCircle,
-  Search,
-  X,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   analysisPhase,
@@ -38,7 +32,7 @@ import {
   radarExit,
   resultsEnter,
   dependencyItem,
-  analysisPulse,
+
 } from '@/lib/animations';
 import { useDownloadQueue } from '@/lib/download-queue';
 
@@ -135,11 +129,11 @@ export function DependencyAnalyzer({
     { id: 'validate', label: '验证兼容性', status: 'pending' },
   ]);
   const [dependencies, setDependencies] = useState<DependencyAnalysis[]>([]);
-  const [installedMods, setInstalledMods] = useState<InstalledMod[]>([]);
+  const [, setInstalledMods] = useState<InstalledMod[]>([]);
   const [missingDependencies, setMissingDependencies] = useState<DependencyAnalysis[]>([]);
   const [optionalDependencies, setOptionalDependencies] = useState<DependencyAnalysis[]>([]);
   const [selectedMissingDep, setSelectedMissingDep] = useState<DependencyAnalysis | null>(null);
-  const [availableVersions, setAvailableVersions] = useState<any[]>([]);
+  const [availableVersions, setAvailableVersions] = useState<Version[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [headerComplete, setHeaderComplete] = useState(false);
   const { addTask } = useDownloadQueue();
@@ -168,6 +162,7 @@ export function DependencyAnalyzer({
       resetState();
       runAnalysis();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, version, selectedMod]);
 
   const updatePhase = (phaseId: string, status: AnalysisPhase['status']) => {
@@ -185,7 +180,7 @@ export function DependencyAnalyzer({
     updatePhase('fetch', 'active');
     await new Promise((r) => setTimeout(r, 400));
 
-    let versionDetails: any = null;
+    let versionDetails: { dependencies?: Dependency[] } | null = null;
     try {
       const res = await fetch(`/api/version?versionId=${version.id}`);
       if (res.ok) {
@@ -286,7 +281,7 @@ export function DependencyAnalyzer({
           const versionsArray = Array.isArray(versions) ? versions : [versions];
           for (const dep of analysis) {
             if (dep.status === 'version-mismatch' && dep.specifiedVersionId) {
-              const versionInfo = versionsArray.find((v: any) => v.id === dep.specifiedVersionId);
+              const versionInfo = versionsArray.find((v: { id: string; version_number?: string }) => v.id === dep.specifiedVersionId);
               if (versionInfo) {
                 dep.specifiedVersionNumber = versionInfo.version_number;
               }
@@ -306,7 +301,7 @@ export function DependencyAnalyzer({
         if (res.ok) {
           const projects = await res.json();
           for (const dep of analysis) {
-            const project = projects.find((p: any) => p.id === dep.projectId);
+            const project = projects.find((p: { id: string; title?: string; slug?: string; icon_url?: string; description?: string }) => p.id === dep.projectId);
             if (project) {
               dep.name = project.title;
               dep.slug = project.slug;
@@ -337,7 +332,7 @@ export function DependencyAnalyzer({
   };
 
   // 检查版本兼容性
-  const checkVersionCompatibility = (v: any): {
+  const checkVersionCompatibility = (v: { game_versions?: string[]; loaders?: string[] }): {
     isCompatible: boolean;
     gameVersionMatch: boolean;
     loaderMatch: boolean;
@@ -380,7 +375,7 @@ export function DependencyAnalyzer({
 
       // 如果API指定了版本，优先使用
       if (dep.specifiedVersionId) {
-        const specifiedVersion = versions.find((v: any) => v.id === dep.specifiedVersionId);
+        const specifiedVersion = versions.find((v: Version) => v.id === dep.specifiedVersionId);
         if (specifiedVersion) {
           // 直接添加到队列（传入 dep 避免状态未更新）
           await addDependencyToQueue(specifiedVersion, dep);
@@ -398,12 +393,12 @@ export function DependencyAnalyzer({
     }
   };
 
-  const addDependencyToQueue = async (depVersion: any, dep?: DependencyAnalysis, isReplace = false) => {
+  const addDependencyToQueue = async (depVersion: Version, dep?: DependencyAnalysis, isReplace = false) => {
     // 使用传入的 dep 或状态中的 selectedMissingDep
     const targetDep = dep || selectedMissingDep;
     if (!targetDep) return;
 
-    const primaryFile = depVersion.files?.find((f: any) => f.primary) || depVersion.files?.[0];
+    const primaryFile = depVersion.files?.find((f: { primary: boolean }) => f.primary) || depVersion.files?.[0];
 
     // 如果是替换操作，先删除旧版本
     if (isReplace && targetDep.installedMod) {
@@ -467,7 +462,7 @@ export function DependencyAnalyzer({
       }
 
       const versions = Array.isArray(data.versions) ? data.versions : [];
-      const specifiedVersion = versions.find((v: any) => v.id === dep.specifiedVersionId);
+      const specifiedVersion = versions.find((v: Version) => v.id === dep.specifiedVersionId);
 
       if (specifiedVersion) {
         // 直接替换为指定版本
@@ -893,7 +888,7 @@ export function DependencyAnalyzer({
                                   )}
                                 </div>
                                 <p className="text-xs text-[#707070] mt-1 truncate">
-                                  {v.files?.find((f: any) => f.primary)?.filename || v.files?.[0]?.filename}
+                                  {v.files?.find((f: { primary: boolean; filename?: string }) => f.primary)?.filename || v.files?.[0]?.filename}
                                 </p>
                                 {/* 加载器和游戏版本元数据 */}
                                 <div className="flex items-center gap-2 mt-2 flex-wrap">

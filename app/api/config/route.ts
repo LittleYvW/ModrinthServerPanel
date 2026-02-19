@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const config = getConfig();
     return NextResponse.json(config);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to get config' },
       { status: 500 }
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     
     saveConfig(config);
     return NextResponse.json({ success: true, config });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to save config' },
       { status: 500 }

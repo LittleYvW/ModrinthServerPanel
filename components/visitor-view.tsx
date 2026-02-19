@@ -11,10 +11,7 @@ import {
   fadeIn, 
   fadeInUp, 
   staggerContainer, 
-  listItem, 
-  cardHover,
-  springScale,
-  iconSpin 
+  listItem
 } from '@/lib/animations';
 
 interface Mod {

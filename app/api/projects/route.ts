@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const validProjects = projects.filter(p => p !== null);
     
     return NextResponse.json(validProjects);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get projects error:', error);
     return NextResponse.json(
       { error: 'Failed to get project details' },

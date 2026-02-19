@@ -10,7 +10,7 @@
  */
 function extractModVersion(version: string): string {
   // 移除前缀 'v' 或 'V'
-  let cleanVersion = version.replace(/^v/i, '');
+  const cleanVersion = version.replace(/^v/i, '');
   
   // 分割所有部分（按 - 或 +）
   const parts = cleanVersion.split(/[-+]/);

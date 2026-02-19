@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getConfig, getMods, addModConfigFile, getModConfigs } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
 
-// 配置文件扩展名
-const CONFIG_EXTENSIONS = ['.json', '.json5', '.toml'];
+
 
 // 从模组文件名提取关键词（用于匹配配置）
 function extractModKeywords(modName: string, filename: string): string[] {
@@ -98,7 +97,7 @@ function scanDirectory(dirPath: string, basePath: string, relativePath: string =
 }
 
 // 扫描模组配置
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const config = getConfig();
     
@@ -153,7 +152,6 @@ export async function POST(request: NextRequest) {
       if (matchedFiles.length > 0) {
         // 检查现有的配置，保留手动关联的文件
         const existingConfig = existingConfigs.find(c => c.modId === mod.id);
-        const existingAutoFiles = existingConfig?.files.filter(f => f.autoDetected) || [];
         const manualFiles = existingConfig?.files.filter(f => !f.autoDetected) || [];
         
         // 合并新扫描到的文件和手动文件
@@ -211,7 +209,7 @@ export async function POST(request: NextRequest) {
 }
 
 // 获取扫描预览（不保存）
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const config = getConfig();
     

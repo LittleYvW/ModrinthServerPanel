@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { FolderOpen, Save, Check, AlertCircle, Server, Eye, LayoutGrid, Sparkles, Lock } from 'lucide-react';
+import { Save, Check, AlertCircle, Server, Eye, LayoutGrid, Sparkles, Lock } from 'lucide-react';
 
 type Loader = 'fabric' | 'forge' | 'quilt' | 'neoforge';
 type ModManagementMode = 'classic' | 'immersive';
@@ -81,7 +81,7 @@ export function ServerConfigPanel() {
         const data = await res.json();
         setError(data.error || '保存失败');
       }
-    } catch (error) {
+    } catch {
       setError('保存失败');
     } finally {
       setLoading(false);

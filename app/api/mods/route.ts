@@ -24,7 +24,7 @@ export async function GET() {
         loaderVersion: config.loaderVersion,
       } 
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to get mods' },
       { status: 500 }
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     
     // 获取版本详情
     const versions = await getProjectVersions(projectId);
-    const version = versions.find((v: any) => v.id === versionId);
+    const version = versions.find((v: { id: string }) => v.id === versionId);
     
     if (!version) {
       return NextResponse.json(
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     const env = analyzeEnvironment(project);
     
     // 获取主文件
-    const primaryFile = version.files.find((f: any) => f.primary) || version.files[0];
+    const primaryFile = version.files.find((f: { primary: boolean }) => f.primary) || version.files[0];
     
     if (!primaryFile) {
       return NextResponse.json(
@@ -166,7 +166,7 @@ export async function DELETE(request: NextRequest) {
     saveMods(mods.filter(m => m.id !== id));
     
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to delete mod' },
       { status: 500 }

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getConfig } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
@@ -60,7 +60,7 @@ function getAllConfigFiles(dirPath: string, basePath: string, relativePath: stri
 }
 
 // 获取所有可用的配置文件
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const config = getConfig();
     

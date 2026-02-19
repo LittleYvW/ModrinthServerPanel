@@ -58,7 +58,7 @@ export function LoginDialog({ onLogin, onCancel }: LoginDialogProps) {
       } else {
         setError('密码错误');
       }
-    } catch (error) {
+    } catch {
       setError('登录失败');
     } finally {
       setLoading(false);

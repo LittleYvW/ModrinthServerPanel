@@ -55,10 +55,11 @@ export async function GET(request: NextRequest) {
     const version = await getVersion(versionId);
     
     return NextResponse.json(version);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { response?: { status?: number } };
     console.error('Get version error:', error);
     
-    if (error.response?.status === 404) {
+    if (err.response?.status === 404) {
       return NextResponse.json(
         { error: 'Version not found' },
         { status: 404 }

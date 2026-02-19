@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Download, Package, Check, Loader2, ExternalLink, Plus, ListPlus, ShieldCheck, ShieldAlert, Heart, Calendar, User, Info, Github, MessageCircle, Book, ExternalLink as ExternalLinkIcon, Tag, Layers, Hash, Code, Globe, Award } from 'lucide-react';
+import { Search, Download, Package, Check, Loader2, ExternalLink, Plus, ShieldCheck, Heart, Calendar, User, Info, Github, MessageCircle, Book, Tag, Layers, Hash, Code, Globe, Award } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDownloadQueue } from '@/lib/download-queue';
 import { DependencyAnalyzer } from '@/components/dependency-analyzer';
@@ -105,7 +105,7 @@ export function ModSearch() {
   const [selectedMod, setSelectedMod] = useState<SearchResult | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
-  const [addedToQueue, setAddedToQueue] = useState<string | null>(null);
+  const [, setAddedToQueue] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
   const [analyzerOpen, setAnalyzerOpen] = useState(false);
@@ -127,7 +127,7 @@ export function ModSearch() {
       } else {
         setError('搜索失败');
       }
-    } catch (error) {
+    } catch {
       setError('搜索出错');
     } finally {
       setSearching(false);
@@ -215,7 +215,7 @@ export function ModSearch() {
       if (res.ok) {
         const data = await res.json();
         const modMap = new Map<string, string>();
-        data.mods?.forEach((mod: any) => {
+        data.mods?.forEach((mod: { versionId: string; name: string }) => {
           modMap.set(mod.versionId, mod.name);
         });
         setInstalledMods(modMap);
@@ -807,7 +807,7 @@ export function ModSearch() {
               {/* 外部链接 */}
               <div>
                 <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                  <ExternalLinkIcon className="w-4 h-4 text-[#00d17a]" />
+                  <ExternalLink className="w-4 h-4 text-[#00d17a]" />
                   外部链接
                 </h4>
                 <div className="flex flex-wrap gap-2">

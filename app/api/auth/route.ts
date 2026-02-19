@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const isDefault = isDefaultPassword();
     return NextResponse.json({ isDefaultPassword: isDefault });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to get auth status' },
       { status: 500 }
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       { error: 'Invalid action' },
       { status: 400 }
     );
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Authentication failed' },
       { status: 500 }

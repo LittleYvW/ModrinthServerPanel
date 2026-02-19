@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     });
     
     return NextResponse.json(results);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to search mods' },
       { status: 500 }
@@ -73,34 +73,35 @@ export async function POST(request: NextRequest) {
       // 不传入过滤参数，获取所有版本
       versions = await getProjectVersions(projectId);
       console.log('[API] Modrinth API returned', versions.length, 'versions');
-    } catch (modrinthError: any) {
+    } catch (modrinthError: unknown) {
+      const err = modrinthError as { name?: string; message?: string; code?: string; response?: { status?: number; statusText?: string; data?: unknown }; config?: { url?: string; params?: unknown } };
       console.error('[API] Modrinth API error:', {
-        name: modrinthError.name,
-        message: modrinthError.message,
-        code: modrinthError.code,
-        status: modrinthError.response?.status,
-        statusText: modrinthError.response?.statusText,
-        data: modrinthError.response?.data,
-        requestUrl: modrinthError.config?.url,
-        requestParams: modrinthError.config?.params
+        name: err.name,
+        message: err.message,
+        code: err.code,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        requestUrl: err.config?.url,
+        requestParams: err.config?.params
       });
       
       // 处理不同类型的错误
-      if (modrinthError.code === 'ECONNRESET' || modrinthError.code === 'ETIMEDOUT') {
+      if (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
         return NextResponse.json(
           { error: '连接 Modrinth API 超时或重置，请重试', versions: [], serverConfig: null, retryable: true },
           { status: 502 }
         );
       }
       
-      if (modrinthError.response?.status === 404) {
+      if (err.response?.status === 404) {
         return NextResponse.json(
           { error: '模组项目不存在', versions: [], serverConfig: null },
           { status: 404 }
         );
       }
       
-      if (modrinthError.response?.status === 429) {
+      if (err.response?.status === 429) {
         return NextResponse.json(
           { error: '请求过于频繁，请稍后再试', versions: [], serverConfig: null, retryable: true },
           { status: 429 }
@@ -109,8 +110,8 @@ export async function POST(request: NextRequest) {
       
       return NextResponse.json(
         { 
-          error: `Modrinth API 错误: ${modrinthError.message || '未知错误'}`, 
-          errorCode: modrinthError.code,
+          error: `Modrinth API 错误: ${err.message || '未知错误'}`, 
+          errorCode: err.code,
           versions: [],
           serverConfig: null
         },
@@ -126,10 +127,11 @@ export async function POST(request: NextRequest) {
         loader: config.loader,
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
     console.error('[API] Unexpected error:', error);
     return NextResponse.json(
-      { error: `Internal server error: ${error.message}`, versions: [], serverConfig: null },
+      { error: `Internal server error: ${err.message}`, versions: [], serverConfig: null },
       { status: 500 }
     );
   }

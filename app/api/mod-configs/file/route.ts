@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
       } else if (ext === '.toml') {
         parsed = TOML.parse(content);
       }
-    } catch (e) {
-      parseError = e instanceof Error ? e.message : 'Parse error';
+    } catch (_e) {
+      parseError = _e instanceof Error ? _e.message : 'Parse error';
     }
     
     return NextResponse.json({
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
           // JSON 格式化输出
           finalContent = JSON.stringify(parsed, null, 2);
         }
-      } catch (e) {
+      } catch {
         // 解析失败，按原样保存
         finalContent = content;
       }

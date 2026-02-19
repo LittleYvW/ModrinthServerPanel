@@ -18,6 +18,8 @@ import {
   Eye,
   Code,
   ChevronDown,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -385,24 +387,28 @@ interface ConfigItemEditorProps {
   config: ConfigValue;
   value: unknown;
   onChange: (path: string, value: unknown) => void;
+  onArrayChange?: (path: string, action: 'add' | 'remove', index?: number) => void;
   isExpanded: boolean;
   onToggle: () => void;
   childConfigs?: ConfigValue[];
   expandedPaths?: Set<string>;
   toggleExpanded?: (path: string) => void;
   allConfigValues?: ConfigValue[];
+  isArrayItem?: boolean;
 }
 
 const ConfigItemEditor = ({ 
   config, 
   value, 
   onChange, 
+  onArrayChange,
   isExpanded, 
   onToggle, 
   childConfigs = [],
   expandedPaths = new Set(),
   toggleExpanded = () => {},
-  allConfigValues = []
+  allConfigValues = [],
+  isArrayItem = false
 }: ConfigItemEditorProps) => {
   const [localValue, setLocalValue] = useState(value);
   const [isEditing, setIsEditing] = useState(false);
@@ -604,7 +610,7 @@ const ConfigItemEditor = ({
           
           {/* 子项展开区域 */}
           <AnimatePresence>
-            {isExpanded && childConfigs.length > 0 && (
+            {isExpanded && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
@@ -637,21 +643,44 @@ const ConfigItemEditor = ({
                       );
                       const hasGrandChildren = grandChildConfigs.length > 0;
                       
+                      // 判断是否为数组类型
+                      const isArray = config.type === 'array';
+                      
                       return (
                         <ConfigItemEditor
                           key={childConfig.path}
                           config={childConfig}
                           value={childConfig.value}
                           onChange={onChange}
+                          onArrayChange={onArrayChange}
                           isExpanded={expandedPaths.has(childConfig.path)}
                           onToggle={() => toggleExpanded(childConfig.path)}
                           childConfigs={hasGrandChildren ? grandChildConfigs : []}
                           expandedPaths={expandedPaths}
                           toggleExpanded={toggleExpanded}
                           allConfigValues={allConfigValues}
+                          isArrayItem={isArray}
                         />
                       );
                     })}
+                    
+                    {/* 数组添加按钮 */}
+                    {config.type === 'array' && onArrayChange && (
+                      <motion.button
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => onArrayChange(config.path, 'add')}
+                        className="w-full py-2.5 px-4 rounded-lg border border-dashed border-[#3a3a3a] 
+                                   text-[#707070] hover:text-emerald-400 hover:border-emerald-500/30 
+                                   hover:bg-emerald-500/5 transition-colors duration-200
+                                   flex items-center justify-center gap-2 text-sm"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>添加项</span>
+                      </motion.button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -711,6 +740,27 @@ const ConfigItemEditor = ({
             <div className="flex-shrink-0">
               {renderEditor()}
             </div>
+            
+            {/* 数组元素删除按钮 */}
+            {isArrayItem && onArrayChange && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => {
+                  // 从路径中提取索引，如 "parent[0]" -> 0
+                  const match = config.path.match(/\[(\d+)\]$/);
+                  if (match) {
+                    const parentPath = config.path.slice(0, config.path.lastIndexOf('['));
+                    onArrayChange(parentPath, 'remove', parseInt(match[1], 10));
+                  }
+                }}
+                className="p-1.5 rounded-md text-[#707070] hover:text-red-400 hover:bg-red-500/10 
+                           transition-colors duration-200 flex-shrink-0"
+                title="删除此项"
+              >
+                <Trash2 className="w-4 h-4" />
+              </motion.button>
+            )}
           </div>
           
           {/* 描述 - 完整展示，保留换行 */}
@@ -1302,6 +1352,91 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     });
   }, []);
   
+  // 处理数组增删
+  const handleArrayChange = useCallback((path: string, action: 'add' | 'remove', index?: number) => {
+    setParsed((prev: unknown) => {
+      const newParsed = JSON.parse(JSON.stringify(prev));
+      
+      // 解析路径
+      const parsePath = (pathStr: string): string[] => {
+        const keys: string[] = [];
+        let current = '';
+        let inBracket = false;
+        
+        for (let i = 0; i < pathStr.length; i++) {
+          const char = pathStr[i];
+          
+          if (char === '[') {
+            if (current) {
+              keys.push(current);
+              current = '';
+            }
+            inBracket = true;
+          } else if (char === ']') {
+            if (current) {
+              keys.push(current);
+              current = '';
+            }
+            inBracket = false;
+          } else if (char === '.' && !inBracket) {
+            if (current) {
+              keys.push(current);
+              current = '';
+            }
+          } else {
+            current += char;
+          }
+        }
+        
+        if (current) {
+          keys.push(current);
+        }
+        
+        return keys;
+      };
+      
+      const keys = parsePath(path);
+      let current: unknown = newParsed;
+      
+      // 遍历到目标数组
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        if (Array.isArray(current)) {
+          current = current[parseInt(key, 10)];
+        } else if (typeof current === 'object' && current !== null) {
+          current = (current as Record<string, unknown>)[key];
+        }
+      }
+      
+      // 执行增删操作
+      if (Array.isArray(current)) {
+        if (action === 'add') {
+          // 根据数组元素类型决定默认值
+          const sampleValue = current.length > 0 ? current[0] : null;
+          let defaultValue: unknown = '';
+          
+          if (typeof sampleValue === 'number') {
+            defaultValue = 0;
+          } else if (typeof sampleValue === 'boolean') {
+            defaultValue = false;
+          } else if (typeof sampleValue === 'string') {
+            defaultValue = '';
+          } else if (Array.isArray(sampleValue)) {
+            defaultValue = [];
+          } else if (typeof sampleValue === 'object' && sampleValue !== null) {
+            defaultValue = {};
+          }
+          
+          current.push(defaultValue);
+        } else if (action === 'remove' && index !== undefined) {
+          current.splice(index, 1);
+        }
+      }
+      
+      return newParsed;
+    });
+  }, []);
+  
   // 切换展开状态
   const toggleExpanded = useCallback((path: string) => {
     setExpandedPaths(prev => {
@@ -1705,6 +1840,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                               config={config}
                               value={config.value}
                               onChange={handleValueChange}
+                              onArrayChange={handleArrayChange}
                               isExpanded={expandedPaths.has(config.path)}
                               onToggle={() => toggleExpanded(config.path)}
                               childConfigs={childConfigs}

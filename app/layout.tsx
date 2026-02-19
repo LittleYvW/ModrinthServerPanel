@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { DownloadQueueProvider } from "@/lib/download-queue";
+import { DebugProvider } from "@/components/debug";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -24,9 +25,11 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={`${inter.variable} antialiased font-sans`}>
-        <DownloadQueueProvider>
-          {children}
-        </DownloadQueueProvider>
+        <DebugProvider>
+          <DownloadQueueProvider>
+            {children}
+          </DownloadQueueProvider>
+        </DebugProvider>
       </body>
     </html>
   );

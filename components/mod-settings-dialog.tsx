@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { LayoutDebugger } from '@/components/debug';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings,
@@ -61,98 +62,6 @@ interface ModSettingsDialogProps {
   modName: string;
   isOpen: boolean;
   onClose: () => void;
-}
-
-// Debug 面板组件 - 用于诊断布局问题
-function DebugPanel({ activeTab }: { activeTab: string }) {
-  const [info, setInfo] = useState({
-    dc: '', md: '', tabs: '', tc: '', sa: '', vp: '', content: '',
-    dcStyle: '', mdStyle: '', tabsStyle: '', tcStyle: ''
-  });
-  
-  useEffect(() => {
-    const update = () => {
-      const dc = document.querySelector('[data-slot="dialog-content"]') as HTMLElement;
-      const md = dc?.querySelector('.h-full.flex.flex-col') as HTMLElement;
-      const tabs = md?.querySelector('[data-slot="tabs"]') as HTMLElement;
-      const tc = tabs?.querySelector('[data-slot="tabs-content"][data-state="active"]') as HTMLElement;
-      const sa = tc?.querySelector('[data-slot="scroll-area"]') as HTMLElement;
-      const vp = sa?.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement;
-      const content = vp?.firstElementChild as HTMLElement;
-      
-      const getInfo = (el: HTMLElement | null | undefined) => {
-        if (!el) return 'not found';
-        const rect = el.getBoundingClientRect();
-        const computed = window.getComputedStyle(el);
-        return `${Math.round(rect.height)}px | display: ${computed.display} | overflow: ${computed.overflow}`;
-      };
-      
-      const getStyle = (el: HTMLElement | null | undefined) => {
-        if (!el) return 'not found';
-        const computed = window.getComputedStyle(el);
-        return `h:${el.style.height || '-'} flex:${computed.flex} flexGrow:${computed.flexGrow}`;
-      };
-      
-      setInfo({
-        dc: getInfo(dc),
-        md: getInfo(md),
-        tabs: getInfo(tabs),
-        tc: getInfo(tc),
-        sa: getInfo(sa),
-        vp: getInfo(vp),
-        content: getInfo(content),
-        dcStyle: getStyle(dc),
-        mdStyle: getStyle(md),
-        tabsStyle: getStyle(tabs),
-        tcStyle: getStyle(tc),
-      });
-    };
-    
-    update();
-    const t = setInterval(update, 500);
-    return () => clearInterval(t);
-  }, [activeTab]);
-  
-  // 按 Alt+D 显示/隐藏
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.altKey && e.key === 'd') {
-        e.preventDefault();
-        setShow(v => !v);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-  
-  if (!show) return (
-    <div className="px-6 pt-2 text-[10px] text-[#505050]">
-      按 Alt+D 显示 Debug 面板
-    </div>
-  );
-  
-  return (
-    <div className="mx-6 mb-2 p-3 bg-red-950/50 border border-red-500/50 rounded text-[11px] font-mono">
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-red-400 font-bold">DEBUG (Alt+D 隐藏)</span>
-        <span className="text-[#707070]">Tab: {activeTab}</span>
-      </div>
-      <div className="space-y-1 text-[#a0a0a0]">
-        <div><span className="text-blue-400">DC:</span> {info.dc}</div>
-        <div><span className="text-blue-400"> └─</span> {info.dcStyle}</div>
-        <div><span className="text-green-400">MD:</span> {info.md}</div>
-        <div><span className="text-green-400"> └─</span> {info.mdStyle}</div>
-        <div><span className="text-yellow-400">Tabs:</span> {info.tabs}</div>
-        <div><span className="text-yellow-400"> └─</span> {info.tabsStyle}</div>
-        <div><span className="text-purple-400">TC:</span> {info.tc}</div>
-        <div><span className="text-purple-400"> └─</span> {info.tcStyle}</div>
-        <div><span className="text-orange-400">SA:</span> {info.sa}</div>
-        <div><span className="text-pink-400">VP:</span> {info.vp}</div>
-        <div><span className="text-gray-400">Content:</span> {info.content}</div>
-      </div>
-    </div>
-  );
 }
 
 // 文件类型图标
@@ -573,7 +482,7 @@ export function ModSettingsDialog({ modId, modName, isOpen, onClose }: ModSettin
             </AnimatePresence>
             
             {/* Debug 面板 */}
-            <DebugPanel activeTab={activeTab} />
+            <LayoutDebugger />
             
             {/* 标签页 */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">

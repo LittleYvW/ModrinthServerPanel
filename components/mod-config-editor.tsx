@@ -150,10 +150,16 @@ function parseKeyLine(line: string): {
     return { key: jsonMatch[1], fullPath: [jsonMatch[1]], indent, isSection: false, isNestedSection: false };
   }
   
-  // JSON5/TOML: 'key': 或 key: 或 key =
+  // JSON5/TOML: 'key': 或 "key" = 或 key: 或 key =
   const json5Match = trimmed.match(/^'([^']+)'\s*[:=]/);
   if (json5Match) {
     return { key: json5Match[1], fullPath: [json5Match[1]], indent, isSection: false, isNestedSection: false };
+  }
+  
+  // TOML: "key" = (双引号键，前面未被 JSON 模式捕获的情况)
+  const tomlQuotedMatch = trimmed.match(/^"([^"]+)"\s*=/);
+  if (tomlQuotedMatch) {
+    return { key: tomlQuotedMatch[1], fullPath: [tomlQuotedMatch[1]], indent, isSection: false, isNestedSection: false };
   }
   
   // Bare key (JSON5/TOML): key: 或 key = (但排除 true/false/null/数字)

@@ -585,9 +585,11 @@ export const arrayItemEnter: Variants = {
   },
   exit: {
     opacity: 0,
-    x: -30,
+    x: '-100%',
+    position: 'absolute',
+    width: '100%',
     transition: { 
-      duration: 0.2, 
+      duration: 0.25, 
       ease: easings.exit,
     },
   },

@@ -621,7 +621,7 @@ const ConfigItemEditor = ({
               >
                 {/* 子项容器 - 带左边框表示层级 */}
                 <div className="px-4 pb-4">
-                  <div className="pl-4 border-l-2 border-[#2a2a2a] space-y-2">
+                  <div className="relative pl-4 border-l-2 border-[#2a2a2a] space-y-2">
                     <AnimatePresence initial={false}>
                       {childConfigs.map((childConfig) => {
                         // 计算子节点的子配置项
@@ -668,6 +668,7 @@ const ConfigItemEditor = ({
                           return (
                             <motion.div
                               key={childConfig.path}
+                              layout
                               variants={arrayItemEnter}
                               initial="hidden"
                               animate="visible"

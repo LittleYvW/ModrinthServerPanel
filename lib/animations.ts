@@ -567,7 +567,7 @@ export const dataFlow = {
 };
 
 // ===== 数组项增删动画 =====
-// 向下滑入的入场动画（不影响布局），向左滑出的出场动画
+// 向下滑入的入场动画，向左滑出并平滑收缩高度的出场动画
 export const arrayItemEnter: Variants = {
   hidden: { 
     opacity: 0, 
@@ -587,9 +587,12 @@ export const arrayItemEnter: Variants = {
   },
   exit: {
     opacity: 0,
-    x: -50,
+    x: -30,
+    scale: 0.95,
+    height: 0,
+    marginBottom: 0,
     transition: { 
-      duration: 0.2, 
+      duration: 0.25, 
       ease: easings.exit,
     },
   },

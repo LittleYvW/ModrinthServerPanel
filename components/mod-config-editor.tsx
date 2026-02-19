@@ -682,6 +682,7 @@ const ConfigItemEditor = ({
                               animate="visible"
                               exit="exit"
                               className="will-change-transform overflow-hidden"
+                              style={{ transformOrigin: 'center top', marginBottom: 8 }}
                             >
                               <ConfigItemEditor {...editorProps} />
                             </motion.div>

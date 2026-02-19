@@ -28,7 +28,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils';
 import { 
   fadeIn, 
-  easings
+  easings,
+  arrayItemEnter,
 } from '@/lib/animations';
 
 // 配置值类型
@@ -621,48 +622,66 @@ const ConfigItemEditor = ({
                 {/* 子项容器 - 带左边框表示层级 */}
                 <div className="px-4 pb-4">
                   <div className="pl-4 border-l-2 border-[#2a2a2a] space-y-2">
-                    {childConfigs.map((childConfig) => {
-                      // 计算子节点的子配置项
-                      // 支持对象属性 (parent.key) 和数组元素 (parent[0]) 两种路径格式
-                      const grandChildConfigs = allConfigValues.filter(
-                        c => {
-                          const isDirectChild = c.depth === childConfig.depth + 1;
-                          if (!isDirectChild) return false;
-                          // 对象属性: parent.child (确保是直接的子属性)
-                          if (c.path.startsWith(childConfig.path + '.')) {
-                            const remaining = c.path.slice((childConfig.path + '.').length);
-                            return !remaining.includes('.') && !remaining.includes('[');
+                    <AnimatePresence initial={false}>
+                      {childConfigs.map((childConfig) => {
+                        // 计算子节点的子配置项
+                        // 支持对象属性 (parent.key) 和数组元素 (parent[0]) 两种路径格式
+                        const grandChildConfigs = allConfigValues.filter(
+                          c => {
+                            const isDirectChild = c.depth === childConfig.depth + 1;
+                            if (!isDirectChild) return false;
+                            // 对象属性: parent.child (确保是直接的子属性)
+                            if (c.path.startsWith(childConfig.path + '.')) {
+                              const remaining = c.path.slice((childConfig.path + '.').length);
+                              return !remaining.includes('.') && !remaining.includes('[');
+                            }
+                            // 数组元素: parent[0] (确保是直接的数组元素)
+                            if (c.path.startsWith(childConfig.path + '[')) {
+                              const remaining = c.path.slice(childConfig.path.length);
+                              return /^\[\d+\]$/.test(remaining);
+                            }
+                            return false;
                           }
-                          // 数组元素: parent[0] (确保是直接的数组元素)
-                          if (c.path.startsWith(childConfig.path + '[')) {
-                            const remaining = c.path.slice(childConfig.path.length);
-                            return /^\[\d+\]$/.test(remaining);
-                          }
-                          return false;
+                        );
+                        const hasGrandChildren = grandChildConfigs.length > 0;
+                        
+                        // 判断是否为数组类型
+                        const isArray = config.type === 'array';
+                        
+                        // 计算编辑器元素
+                        const editorProps = {
+                          config: childConfig,
+                          value: childConfig.value,
+                          onChange,
+                          onArrayChange,
+                          isExpanded: expandedPaths.has(childConfig.path),
+                          onToggle: () => toggleExpanded(childConfig.path),
+                          childConfigs: hasGrandChildren ? grandChildConfigs : [],
+                          expandedPaths,
+                          toggleExpanded,
+                          allConfigValues,
+                          isArrayItem: isArray,
+                        };
+                        
+                        // 只为数组类型的子项添加动画
+                        if (config.type === 'array') {
+                          return (
+                            <motion.div
+                              key={childConfig.path}
+                              variants={arrayItemEnter}
+                              initial="hidden"
+                              animate="visible"
+                              exit="exit"
+                              className="will-change-transform"
+                            >
+                              <ConfigItemEditor {...editorProps} />
+                            </motion.div>
+                          );
                         }
-                      );
-                      const hasGrandChildren = grandChildConfigs.length > 0;
-                      
-                      // 判断是否为数组类型
-                      const isArray = config.type === 'array';
-                      
-                      return (
-                        <ConfigItemEditor
-                          key={childConfig.path}
-                          config={childConfig}
-                          value={childConfig.value}
-                          onChange={onChange}
-                          onArrayChange={onArrayChange}
-                          isExpanded={expandedPaths.has(childConfig.path)}
-                          onToggle={() => toggleExpanded(childConfig.path)}
-                          childConfigs={hasGrandChildren ? grandChildConfigs : []}
-                          expandedPaths={expandedPaths}
-                          toggleExpanded={toggleExpanded}
-                          allConfigValues={allConfigValues}
-                          isArrayItem={isArray}
-                        />
-                      );
-                    })}
+                        
+                        return <ConfigItemEditor key={childConfig.path} {...editorProps} />;
+                      })}
+                    </AnimatePresence>
                     
                     {/* 数组添加按钮 */}
                     {config.type === 'array' && onArrayChange && (

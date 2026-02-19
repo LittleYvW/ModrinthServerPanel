@@ -565,3 +565,48 @@ export const dataFlow = {
     },
   },
 };
+
+// ===== 数组项增删动画 =====
+// 向下滑入的入场动画，向左滑出的出场动画
+export const arrayItemEnter: Variants = {
+  hidden: { 
+    opacity: 0, 
+    y: -20,
+    scale: 0.98,
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scale: 1,
+    transition: { 
+      duration: 0.3, 
+      ease: easings.spring,
+    },
+  },
+  exit: {
+    opacity: 0,
+    x: -30,
+    transition: { 
+      duration: 0.2, 
+      ease: easings.exit,
+    },
+  },
+};
+
+// 数组项容器动画（用于 AnimatePresence）
+export const arrayItemContainer: Variants = {
+  hidden: { opacity: 1 },
+  visible: { 
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+  exit: { 
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.03,
+      staggerDirection: -1,
+    },
+  },
+};

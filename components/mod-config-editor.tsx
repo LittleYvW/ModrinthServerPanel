@@ -318,6 +318,18 @@ function extractConfigValues(
     return [{ key: path, value: null, type: 'null', path, depth }];
   }
   
+  // 处理基本类型（作为数组元素时）
+  if (typeof obj !== 'object') {
+    const key = path.match(/\[([^\]]+)\]$/)?.[1] || path;
+    return [{
+      key,
+      value: obj,
+      type: typeof obj as ConfigValue['type'],
+      path,
+      depth,
+    }];
+  }
+  
   if (typeof obj === 'object' && !Array.isArray(obj)) {
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       const currentPath = path ? `${path}.${key}` : key;
@@ -344,7 +356,24 @@ function extractConfigValues(
   } else if (Array.isArray(obj)) {
     obj.forEach((item, index) => {
       const currentPath = `${path}[${index}]`;
-      results.push(...extractConfigValues(item, content, currentPath, depth + 1));
+      const itemType = Array.isArray(item) ? 'array' :
+                       item === null ? 'null' :
+                       typeof item as ConfigValue['type'];
+      
+      // 注意：这里的 depth 已经是父级的 depth + 1（从递归调用传入）
+      // 所以数组元素应该使用当前的 depth，不需要再 +1
+      if (typeof item !== 'object' || item === null) {
+        results.push({
+          key: String(index),
+          value: item,
+          type: itemType,
+          path: currentPath,
+          depth,
+        });
+      } else {
+        // 对象或嵌套数组，递归处理
+        results.push(...extractConfigValues(item, content, currentPath, depth));
+      }
     });
   }
   
@@ -588,8 +617,23 @@ const ConfigItemEditor = ({
                   <div className="pl-4 border-l-2 border-[#2a2a2a] space-y-2">
                     {childConfigs.map((childConfig) => {
                       // 计算子节点的子配置项
+                      // 支持对象属性 (parent.key) 和数组元素 (parent[0]) 两种路径格式
                       const grandChildConfigs = allConfigValues.filter(
-                        c => c.path.startsWith(childConfig.path + '.') && c.depth === childConfig.depth + 1
+                        c => {
+                          const isDirectChild = c.depth === childConfig.depth + 1;
+                          if (!isDirectChild) return false;
+                          // 对象属性: parent.child (确保是直接的子属性)
+                          if (c.path.startsWith(childConfig.path + '.')) {
+                            const remaining = c.path.slice((childConfig.path + '.').length);
+                            return !remaining.includes('.') && !remaining.includes('[');
+                          }
+                          // 数组元素: parent[0] (确保是直接的数组元素)
+                          if (c.path.startsWith(childConfig.path + '[')) {
+                            const remaining = c.path.slice(childConfig.path.length);
+                            return /^\[\d+\]$/.test(remaining);
+                          }
+                          return false;
+                        }
                       );
                       const hasGrandChildren = grandChildConfigs.length > 0;
                       
@@ -1188,14 +1232,72 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   const handleValueChange = useCallback((path: string, newValue: unknown) => {
     setParsed((prev: unknown) => {
       const newParsed = JSON.parse(JSON.stringify(prev));
-      const keys = path.split('.');
-      let current: Record<string, unknown> = newParsed as Record<string, unknown>;
+      
+      // 解析路径，支持数组索引，如 "key[0].subKey" -> ['key', '0', 'subKey']
+      const parsePath = (pathStr: string): string[] => {
+        const keys: string[] = [];
+        let current = '';
+        let inBracket = false;
+        
+        for (let i = 0; i < pathStr.length; i++) {
+          const char = pathStr[i];
+          
+          if (char === '[') {
+            if (current) {
+              keys.push(current);
+              current = '';
+            }
+            inBracket = true;
+          } else if (char === ']') {
+            if (current) {
+              keys.push(current); // 数组索引作为字符串
+              current = '';
+            }
+            inBracket = false;
+          } else if (char === '.' && !inBracket) {
+            if (current) {
+              keys.push(current);
+              current = '';
+            }
+          } else {
+            current += char;
+          }
+        }
+        
+        if (current) {
+          keys.push(current);
+        }
+        
+        return keys;
+      };
+      
+      const keys = parsePath(path);
+      let current: unknown = newParsed;
       
       for (let i = 0; i < keys.length - 1; i++) {
-        current = current[keys[i]] as Record<string, unknown>;
+        const key = keys[i];
+        const nextKey = keys[i + 1];
+        const isNextKeyArrayIndex = /^\d+$/.test(nextKey);
+        
+        if (Array.isArray(current)) {
+          current = current[parseInt(key, 10)];
+        } else if (typeof current === 'object' && current !== null) {
+          current = (current as Record<string, unknown>)[key];
+        }
+        
+        // 如果下一级是数组索引但当前值不是数组，创建数组
+        if (isNextKeyArrayIndex && !Array.isArray(current) && typeof current === 'object' && current !== null) {
+          // 保持原样， shouldn't happen in valid config
+        }
       }
       
-      current[keys[keys.length - 1]] = newValue;
+      const lastKey = keys[keys.length - 1];
+      if (Array.isArray(current)) {
+        current[parseInt(lastKey, 10)] = newValue;
+      } else if (typeof current === 'object' && current !== null) {
+        (current as Record<string, unknown>)[lastKey] = newValue;
+      }
+      
       return newParsed;
     });
   }, []);
@@ -1564,8 +1666,25 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                     >
                       {topLevelConfigs.map((config) => {
                         // 获取该配置项的直接子配置项
+                        // 支持对象属性 (parent.key) 和数组元素 (parent[0]) 两种路径格式
                         const childConfigs = configValues.filter(
-                          c => c.path.startsWith(config.path + '.') && c.depth === config.depth + 1
+                          c => {
+                            const isDirectChild = c.depth === config.depth + 1;
+                            if (!isDirectChild) return false;
+                            // 对象属性: parent.child (确保是直接的子属性)
+                            if (c.path.startsWith(config.path + '.')) {
+                              const remaining = c.path.slice((config.path + '.').length);
+                              // 剩余部分不能包含 . 或 [，否则是更深层的嵌套
+                              return !remaining.includes('.') && !remaining.includes('[');
+                            }
+                            // 数组元素: parent[0] (确保是直接的数组元素)
+                            if (c.path.startsWith(config.path + '[')) {
+                              const remaining = c.path.slice(config.path.length);
+                              // 匹配 [数字] 且后面没有其他字符
+                              return /^\[\d+\]$/.test(remaining);
+                            }
+                            return false;
+                          }
                         );
                         return (
                           <motion.div 

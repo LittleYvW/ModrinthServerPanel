@@ -569,7 +569,7 @@ const ConfigItemEditor = ({
         case 'string':
           return {
             border: 'border-emerald-500/50',
-            shadow: 'shadow-[0_0_20px_rgba(16,185,129,0.15)]',
+            boxShadow: '0 0 20px rgba(16, 185, 129, 0.15), 0 0 0 1px rgba(16, 185, 129, 0.1)',
             bg: 'rgba(16, 185, 129, 0.08)',
             indicator: 'from-emerald-400 via-emerald-500 to-emerald-400',
             glow: 'from-emerald-500/50 via-emerald-400/30 to-transparent',
@@ -577,7 +577,7 @@ const ConfigItemEditor = ({
         case 'number':
           return {
             border: 'border-blue-500/50',
-            shadow: 'shadow-[0_0_20px_rgba(59,130,246,0.15)]',
+            boxShadow: '0 0 20px rgba(59, 130, 246, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.1)',
             bg: 'rgba(59, 130, 246, 0.08)',
             indicator: 'from-blue-400 via-blue-500 to-blue-400',
             glow: 'from-blue-500/50 via-blue-400/30 to-transparent',
@@ -585,7 +585,7 @@ const ConfigItemEditor = ({
         case 'boolean':
           return {
             border: 'border-purple-500/50',
-            shadow: 'shadow-[0_0_20px_rgba(139,92,246,0.15)]',
+            boxShadow: '0 0 20px rgba(139, 92, 246, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.1)',
             bg: 'rgba(139, 92, 246, 0.08)',
             indicator: 'from-purple-400 via-purple-500 to-purple-400',
             glow: 'from-purple-500/50 via-purple-400/30 to-transparent',
@@ -594,7 +594,7 @@ const ConfigItemEditor = ({
         case 'array':
           return {
             border: 'border-amber-500/50',
-            shadow: 'shadow-[0_0_20px_rgba(245,158,11,0.15)]',
+            boxShadow: '0 0 20px rgba(245, 158, 11, 0.15), 0 0 0 1px rgba(245, 158, 11, 0.1)',
             bg: 'rgba(245, 158, 11, 0.08)',
             indicator: 'from-amber-400 via-amber-500 to-amber-400',
             glow: 'from-amber-500/50 via-amber-400/30 to-transparent',
@@ -602,7 +602,7 @@ const ConfigItemEditor = ({
         default:
           return {
             border: 'border-gray-500/50',
-            shadow: 'shadow-[0_0_20px_rgba(107,114,128,0.15)]',
+            boxShadow: '0 0 20px rgba(107, 114, 128, 0.15), 0 0 0 1px rgba(107, 114, 128, 0.1)',
             bg: 'rgba(107, 114, 128, 0.08)',
             indicator: 'from-gray-400 via-gray-500 to-gray-400',
             glow: 'from-gray-500/50 via-gray-400/30 to-transparent',
@@ -620,18 +620,25 @@ const ConfigItemEditor = ({
         {/* 父级项 - 卡片样式 */}
         <motion.div 
           className={cn(
-            'rounded-lg border transition-all duration-300 overflow-hidden relative',
+            'rounded-lg border overflow-hidden relative',
             getTypeBgColor(config.type),
-            isExpanded ? 'border-opacity-50 shadow-lg shadow-black/20' : 'hover:border-opacity-30',
-            isModified && [modifiedColors.border, modifiedColors.shadow]
+            isExpanded ? 'border-opacity-50' : 'hover:border-opacity-30',
+            isModified && modifiedColors.border
           )}
           initial={false}
           animate={isModified ? {
             backgroundColor: modifiedColors.bg,
+            boxShadow: modifiedColors.boxShadow,
           } : {
             backgroundColor: 'rgba(0, 0, 0, 0)',
+            boxShadow: isExpanded 
+              ? '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)' 
+              : '0 0 0 0 rgba(0, 0, 0, 0)',
           }}
-          transition={{ duration: 0.3 }}
+          transition={{ 
+            duration: 0.4, 
+            ease: [0.25, 0.1, 0.25, 1],
+          }}
         >
           {/* 未保存指示器 - 渐变发光效果 */}
           {isModified && (
@@ -871,7 +878,7 @@ const ConfigItemEditor = ({
       case 'string':
         return {
           border: 'border-emerald-500/50',
-          shadow: 'shadow-[0_0_16px_rgba(16,185,129,0.12)]',
+          boxShadow: '0 0 16px rgba(16, 185, 129, 0.12), 0 0 0 1px rgba(16, 185, 129, 0.08)',
           bg: 'rgba(16, 185, 129, 0.06)',
           indicator: 'from-emerald-400 via-emerald-500 to-emerald-400',
           glow: 'from-emerald-500/50 via-emerald-400/30 to-transparent',
@@ -879,7 +886,7 @@ const ConfigItemEditor = ({
       case 'number':
         return {
           border: 'border-blue-500/50',
-          shadow: 'shadow-[0_0_16px_rgba(59,130,246,0.12)]',
+          boxShadow: '0 0 16px rgba(59, 130, 246, 0.12), 0 0 0 1px rgba(59, 130, 246, 0.08)',
           bg: 'rgba(59, 130, 246, 0.06)',
           indicator: 'from-blue-400 via-blue-500 to-blue-400',
           glow: 'from-blue-500/50 via-blue-400/30 to-transparent',
@@ -887,7 +894,7 @@ const ConfigItemEditor = ({
       case 'boolean':
         return {
           border: 'border-purple-500/50',
-          shadow: 'shadow-[0_0_16px_rgba(139,92,246,0.12)]',
+          boxShadow: '0 0 16px rgba(139, 92, 246, 0.12), 0 0 0 1px rgba(139, 92, 246, 0.08)',
           bg: 'rgba(139, 92, 246, 0.06)',
           indicator: 'from-purple-400 via-purple-500 to-purple-400',
           glow: 'from-purple-500/50 via-purple-400/30 to-transparent',
@@ -896,7 +903,7 @@ const ConfigItemEditor = ({
       case 'array':
         return {
           border: 'border-amber-500/50',
-          shadow: 'shadow-[0_0_16px_rgba(245,158,11,0.12)]',
+          boxShadow: '0 0 16px rgba(245, 158, 11, 0.12), 0 0 0 1px rgba(245, 158, 11, 0.08)',
           bg: 'rgba(245, 158, 11, 0.06)',
           indicator: 'from-amber-400 via-amber-500 to-amber-400',
           glow: 'from-amber-500/50 via-amber-400/30 to-transparent',
@@ -904,7 +911,7 @@ const ConfigItemEditor = ({
       default:
         return {
           border: 'border-gray-500/50',
-          shadow: 'shadow-[0_0_16px_rgba(107,114,128,0.12)]',
+          boxShadow: '0 0 16px rgba(107, 114, 128, 0.12), 0 0 0 1px rgba(107, 114, 128, 0.08)',
           bg: 'rgba(107, 114, 128, 0.06)',
           indicator: 'from-gray-400 via-gray-500 to-gray-400',
           glow: 'from-gray-500/50 via-gray-400/30 to-transparent',
@@ -921,18 +928,23 @@ const ConfigItemEditor = ({
     >
       <motion.div 
         className={cn(
-          'flex items-start gap-3 px-4 py-3.5 rounded-lg border transition-all duration-300 relative',
+          'flex items-start gap-3 px-4 py-3.5 rounded-lg border relative',
           'hover:border-[#3a3a3a] hover:bg-white/[0.02]',
           getTypeBgColor(config.type),
-          isModified && [modifiedColors.border, modifiedColors.shadow]
+          isModified && modifiedColors.border
         )}
         initial={false}
         animate={isModified ? {
           backgroundColor: modifiedColors.bg,
+          boxShadow: modifiedColors.boxShadow,
         } : {
           backgroundColor: 'rgba(0, 0, 0, 0)',
+          boxShadow: '0 0 0 0 rgba(0, 0, 0, 0)',
         }}
-        transition={{ duration: 0.25 }}
+        transition={{ 
+          duration: 0.35, 
+          ease: [0.25, 0.1, 0.25, 1],
+        }}
       >
         {/* 未保存指示器 - 渐变发光效果 */}
         {isModified && (

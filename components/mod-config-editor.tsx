@@ -563,23 +563,94 @@ const ConfigItemEditor = ({
     // 将描述按换行分割
     const descriptionLines = config.description ? config.description.split('\n') : [];
     
+    // 根据类型获取对应的颜色
+    const getModifiedColors = () => {
+      switch (config.type) {
+        case 'string':
+          return {
+            border: 'border-emerald-500/50',
+            shadow: 'shadow-[0_0_20px_rgba(16,185,129,0.15)]',
+            bg: 'rgba(16, 185, 129, 0.08)',
+            indicator: 'from-emerald-400 via-emerald-500 to-emerald-400',
+            glow: 'from-emerald-500/50 via-emerald-400/30 to-transparent',
+          };
+        case 'number':
+          return {
+            border: 'border-blue-500/50',
+            shadow: 'shadow-[0_0_20px_rgba(59,130,246,0.15)]',
+            bg: 'rgba(59, 130, 246, 0.08)',
+            indicator: 'from-blue-400 via-blue-500 to-blue-400',
+            glow: 'from-blue-500/50 via-blue-400/30 to-transparent',
+          };
+        case 'boolean':
+          return {
+            border: 'border-purple-500/50',
+            shadow: 'shadow-[0_0_20px_rgba(139,92,246,0.15)]',
+            bg: 'rgba(139, 92, 246, 0.08)',
+            indicator: 'from-purple-400 via-purple-500 to-purple-400',
+            glow: 'from-purple-500/50 via-purple-400/30 to-transparent',
+          };
+        case 'object':
+        case 'array':
+          return {
+            border: 'border-amber-500/50',
+            shadow: 'shadow-[0_0_20px_rgba(245,158,11,0.15)]',
+            bg: 'rgba(245, 158, 11, 0.08)',
+            indicator: 'from-amber-400 via-amber-500 to-amber-400',
+            glow: 'from-amber-500/50 via-amber-400/30 to-transparent',
+          };
+        default:
+          return {
+            border: 'border-gray-500/50',
+            shadow: 'shadow-[0_0_20px_rgba(107,114,128,0.15)]',
+            bg: 'rgba(107, 114, 128, 0.08)',
+            indicator: 'from-gray-400 via-gray-500 to-gray-400',
+            glow: 'from-gray-500/50 via-gray-400/30 to-transparent',
+          };
+      }
+    };
+    
+    const modifiedColors = getModifiedColors();
+    
     return (
       <div
         className="group"
         style={{ marginLeft: `${config.depth * 16}px` }}
       >
         {/* 父级项 - 卡片样式 */}
-        <div 
+        <motion.div 
           className={cn(
-            'rounded-lg border transition-all duration-200 overflow-hidden relative',
+            'rounded-lg border transition-all duration-300 overflow-hidden relative',
             getTypeBgColor(config.type),
             isExpanded ? 'border-opacity-50 shadow-lg shadow-black/20' : 'hover:border-opacity-30',
-            isModified && 'ring-1 ring-amber-500/30 border-amber-500/30'
+            isModified && [modifiedColors.border, modifiedColors.shadow]
           )}
+          initial={false}
+          animate={isModified ? {
+            backgroundColor: modifiedColors.bg,
+          } : {
+            backgroundColor: 'rgba(0, 0, 0, 0)',
+          }}
+          transition={{ duration: 0.3 }}
         >
-          {/* 未保存指示器 */}
+          {/* 未保存指示器 - 渐变发光效果 */}
           {isModified && (
-            <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-amber-500" />
+            <>
+              {/* 左侧主指示条 */}
+              <motion.div 
+                className={cn("absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b", modifiedColors.indicator)}
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={{ scaleY: 1, opacity: 1 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+              />
+              {/* 顶部微光 */}
+              <motion.div 
+                className={cn("absolute left-0 right-0 top-0 h-px bg-gradient-to-r", modifiedColors.glow)}
+                initial={{ opacity: 0, x: '-100%' }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+              />
+            </>
           )}
           {/* 头部 - 可点击展开，使用 flex 布局容纳删除按钮 */}
           <div className="flex items-center">
@@ -785,7 +856,7 @@ const ConfigItemEditor = ({
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -794,20 +865,93 @@ const ConfigItemEditor = ({
   // 将描述按换行分割
   const descriptionLines = config.description ? config.description.split('\n') : [];
   
+  // 根据类型获取对应的颜色
+  const getModifiedColors = () => {
+    switch (config.type) {
+      case 'string':
+        return {
+          border: 'border-emerald-500/50',
+          shadow: 'shadow-[0_0_16px_rgba(16,185,129,0.12)]',
+          bg: 'rgba(16, 185, 129, 0.06)',
+          indicator: 'from-emerald-400 via-emerald-500 to-emerald-400',
+          glow: 'from-emerald-500/50 via-emerald-400/30 to-transparent',
+        };
+      case 'number':
+        return {
+          border: 'border-blue-500/50',
+          shadow: 'shadow-[0_0_16px_rgba(59,130,246,0.12)]',
+          bg: 'rgba(59, 130, 246, 0.06)',
+          indicator: 'from-blue-400 via-blue-500 to-blue-400',
+          glow: 'from-blue-500/50 via-blue-400/30 to-transparent',
+        };
+      case 'boolean':
+        return {
+          border: 'border-purple-500/50',
+          shadow: 'shadow-[0_0_16px_rgba(139,92,246,0.12)]',
+          bg: 'rgba(139, 92, 246, 0.06)',
+          indicator: 'from-purple-400 via-purple-500 to-purple-400',
+          glow: 'from-purple-500/50 via-purple-400/30 to-transparent',
+        };
+      case 'object':
+      case 'array':
+        return {
+          border: 'border-amber-500/50',
+          shadow: 'shadow-[0_0_16px_rgba(245,158,11,0.12)]',
+          bg: 'rgba(245, 158, 11, 0.06)',
+          indicator: 'from-amber-400 via-amber-500 to-amber-400',
+          glow: 'from-amber-500/50 via-amber-400/30 to-transparent',
+        };
+      default:
+        return {
+          border: 'border-gray-500/50',
+          shadow: 'shadow-[0_0_16px_rgba(107,114,128,0.12)]',
+          bg: 'rgba(107, 114, 128, 0.06)',
+          indicator: 'from-gray-400 via-gray-500 to-gray-400',
+          glow: 'from-gray-500/50 via-gray-400/30 to-transparent',
+        };
+    }
+  };
+  
+  const modifiedColors = getModifiedColors();
+  
   return (
     <div
       className="group"
       style={{ marginLeft: `${config.depth * 16}px` }}
     >
-      <div className={cn(
-        'flex items-start gap-3 px-4 py-3.5 rounded-lg border transition-all duration-200 relative',
-        'hover:border-[#3a3a3a] hover:bg-white/[0.02]',
-        getTypeBgColor(config.type),
-        isModified && 'ring-1 ring-amber-500/30 border-amber-500/30 bg-amber-500/5'
-      )}>
-        {/* 未保存指示器 */}
+      <motion.div 
+        className={cn(
+          'flex items-start gap-3 px-4 py-3.5 rounded-lg border transition-all duration-300 relative',
+          'hover:border-[#3a3a3a] hover:bg-white/[0.02]',
+          getTypeBgColor(config.type),
+          isModified && [modifiedColors.border, modifiedColors.shadow]
+        )}
+        initial={false}
+        animate={isModified ? {
+          backgroundColor: modifiedColors.bg,
+        } : {
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+        }}
+        transition={{ duration: 0.25 }}
+      >
+        {/* 未保存指示器 - 渐变发光效果 */}
         {isModified && (
-          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-amber-500" />
+          <>
+            {/* 左侧主指示条 */}
+            <motion.div 
+              className={cn("absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b", modifiedColors.indicator)}
+              initial={{ scaleY: 0, opacity: 0 }}
+              animate={{ scaleY: 1, opacity: 1 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            />
+            {/* 顶部微光 */}
+            <motion.div 
+              className={cn("absolute left-0 right-0 top-0 h-px bg-gradient-to-r", modifiedColors.glow)}
+              initial={{ opacity: 0, x: '-100%' }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.25, delay: 0.05 }}
+            />
+          </>
         )}
         {/* 左侧占位（保持对齐） */}
         <div className="w-5 flex-shrink-0 mt-0.5" />
@@ -894,7 +1038,7 @@ const ConfigItemEditor = ({
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

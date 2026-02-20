@@ -1584,20 +1584,24 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
       const data = await res.json();
       
       if (data.success) {
-        // 更新所有相关状态，确保一致性
+        // 先保持 saving 状态短暂时间，让加载动画完整显示
+        // 然后切换到成功态，确保动画序列正确
+        setTimeout(() => {
+          setSaving(false);
+          setSaveSuccess(true);
+          // 延长成功状态显示时间，让用户有足够时间感知
+          setTimeout(() => setSaveSuccess(false), 2500);
+        }, 300);
+        // 更新内容状态
         setContent(finalContent);
         setOriginalContent(finalContent);
         setHasChanges(false);
-        setSaveSuccess(true);
-        // 延长成功状态显示时间，让用户有足够时间感知
-        setTimeout(() => setSaveSuccess(false), 2500);
         onSave?.();
       } else {
         setError(data.error || 'Failed to save file');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
       setSaving(false);
     }
   };
@@ -2020,11 +2024,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
             </AnimatePresence>
             
             {/* 保存按钮 - 响应式三态动画 */}
-            <motion.div 
-              layout
-              className="relative"
-            >
-              <AnimatePresence mode="wait">
+            <div className="relative">
+              <AnimatePresence mode="wait" initial={false}>
                 {saveSuccess ? (
                   /* 成功态 */
                   <motion.div
@@ -2181,7 +2182,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.div>
+            </div>
           </motion.div>
         </div>
         

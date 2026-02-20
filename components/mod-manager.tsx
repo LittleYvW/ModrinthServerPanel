@@ -20,7 +20,7 @@ import {
   fadeIn, 
   staggerContainer, 
   listItem, 
-
+  springScale,
   dropdownMenu 
 } from '@/lib/animations';
 import { useDownloadQueue } from '@/lib/download-queue';

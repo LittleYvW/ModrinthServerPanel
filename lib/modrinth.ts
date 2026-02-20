@@ -76,13 +76,13 @@ export async function getProjectVersions(
     // Log error details for debugging
     console.error('[Modrinth] API error:', err.message, err.code);
     console.error('[Modrinth] API error:', {
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      url: error.config?.url,
-      params: error.config?.params
+      message: err.message,
+      code: err.code,
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      data: err.response?.data,
+      url: err.config?.url,
+      params: err.config?.params
     });
     throw error;
   }
@@ -122,8 +122,8 @@ export function analyzeEnvironment(data: { client_support?: string; server_suppo
   }
   
   return {
-    client,
-    server,
+    client: client as 'required' | 'optional' | 'unsupported',
+    server: server as 'required' | 'optional' | 'unsupported',
     category,
   };
 }

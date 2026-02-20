@@ -11,7 +11,8 @@ import {
   fadeIn, 
   fadeInUp, 
   staggerContainer, 
-  listItem
+  listItem,
+  springScale
 } from '@/lib/animations';
 
 interface Mod {

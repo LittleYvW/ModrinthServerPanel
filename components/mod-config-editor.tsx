@@ -1152,7 +1152,7 @@ const CodePreview = ({ content, type }: CodePreviewProps) => {
     if (!content) return [];
     return content.split('\n').map(line => {
       const tokens = tokenizeLine(line, type);
-      return postProcessTokens(tokens, type);
+      return postProcessTokens(tokens);
     });
   }, [content, type]);
   

@@ -1330,7 +1330,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         setIsGeneratingPreview(true);
         try {
           const { default: TOML } = await import('@iarna/toml');
-          const content = TOML.stringify(parsed as Record<string, unknown>);
+          const content = TOML.stringify(parsed as unknown as Parameters<typeof TOML.stringify>[0]);
           setTomlPreviewContent(content);
         } catch {
           setTomlPreviewContent('');
@@ -1624,7 +1624,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
           finalContent = JSON.stringify(parsed, null, 2);
         } else if (fileType === 'toml') {
           const { default: TOML } = await import('@iarna/toml');
-          finalContent = TOML.stringify(parsed as Record<string, unknown>);
+          finalContent = TOML.stringify(parsed as unknown as Parameters<typeof TOML.stringify>[0]);
         }
       }
       

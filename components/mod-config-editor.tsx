@@ -320,7 +320,8 @@ function extractConfigValues(
   obj: unknown, 
   content: string,
   path: string = '', 
-  depth: number = 0
+  depth: number = 0,
+  isArrayElement: boolean = false
 ): ConfigValue[] {
   const results: ConfigValue[] = [];
   
@@ -341,6 +342,18 @@ function extractConfigValues(
   }
   
   if (typeof obj === 'object' && !Array.isArray(obj)) {
+    // 如果是数组中的对象元素，先添加对象本身作为配置项
+    if (isArrayElement) {
+      const key = path.match(/\[([^\]]+)\]$/)?.[1] || path;
+      results.push({
+        key,
+        value: obj,
+        type: 'object',
+        path,
+        depth,
+      });
+    }
+    
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       const currentPath = path ? `${path}.${key}` : key;
       const type = Array.isArray(value) ? 'array' : 
@@ -356,11 +369,11 @@ function extractConfigValues(
         type,
         description: extractDescription(content, key, parentPath),
         path: currentPath,
-        depth,
+        depth: isArrayElement ? depth + 1 : depth,
       });
       
       if (typeof value === 'object' && value !== null) {
-        results.push(...extractConfigValues(value, content, currentPath, depth + 1));
+        results.push(...extractConfigValues(value, content, currentPath, isArrayElement ? depth + 1 : depth + 1));
       }
     }
   } else if (Array.isArray(obj)) {
@@ -381,8 +394,8 @@ function extractConfigValues(
           depth,
         });
       } else {
-        // 对象或嵌套数组，递归处理
-        results.push(...extractConfigValues(item, content, currentPath, depth));
+        // 对象或嵌套数组，标记为数组元素以便正确处理
+        results.push(...extractConfigValues(item, content, currentPath, depth, true));
       }
     });
   }
@@ -587,7 +600,8 @@ const ConfigItemEditor = ({
                     'font-semibold text-base',
                     config.depth === 0 ? 'text-white' : 'text-[#b0b0b0]'
                   )}>
-                    {config.key}
+                    {/* 检测是否为数组中的对象元素（路径以 [数字] 结尾） */}
+                    {/^\[\d+\]$/.test(config.key) ? `项目 ${config.key.slice(1, -1)}` : config.key}
                   </span>
                   <Badge 
                     variant="outline" 
@@ -761,7 +775,8 @@ const ConfigItemEditor = ({
                 'font-medium text-base',
                 config.depth === 0 ? 'text-white' : 'text-[#c0c0c0]'
               )}>
-                {config.key}
+                {/* 检测是否为数组中的基本类型元素（路径以 [数字] 结尾） */}
+                {/^\[\d+\]$/.test(config.key) ? `项目 ${config.key.slice(1, -1)}` : config.key}
               </span>
               <Badge 
                 variant="outline" 
@@ -1520,7 +1535,19 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
           } else if (Array.isArray(sampleValue)) {
             defaultValue = [];
           } else if (typeof sampleValue === 'object' && sampleValue !== null) {
-            defaultValue = {};
+            // 对象数组：创建一个包含所有相同键的空对象
+            defaultValue = Object.fromEntries(
+              Object.keys(sampleValue).map(key => {
+                const val = (sampleValue as Record<string, unknown>)[key];
+                let defaultVal: unknown = '';
+                if (typeof val === 'number') defaultVal = 0;
+                else if (typeof val === 'boolean') defaultVal = false;
+                else if (typeof val === 'string') defaultVal = '';
+                else if (Array.isArray(val)) defaultVal = [];
+                else if (typeof val === 'object' && val !== null) defaultVal = {};
+                return [key, defaultVal];
+              })
+            );
           }
           
           current.push(defaultValue);

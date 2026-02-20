@@ -1780,30 +1780,27 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                 <motion.div
                   key="unsaved-group"
                   layout
-                  initial={{ opacity: 0, scale: 0.8, width: 0 }}
-                  animate={{ opacity: 1, scale: 1, width: 'auto' }}
-                  exit={{ opacity: 0, scale: 0.8, width: 0 }}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
                   transition={{ 
-                    duration: 0.25,
+                    duration: 0.2,
                     ease: easings.standard
                   }}
-                  className="flex items-center gap-1.5 sm:gap-2 overflow-hidden"
+                  className="flex items-center gap-1.5 sm:gap-2"
                 >
                   {/* 未保存指示 - 响应式：窄屏仅显示图标 */}
                   <motion.div 
                     layout
-                    className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0 border border-amber-500/20"
+                    className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0 border border-amber-500/20 min-w-fit"
                   >
                     <span className="relative flex h-2 w-2 flex-shrink-0">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                     </span>
-                    <motion.span 
-                      layout
-                      className="text-xs font-medium hidden sm:inline whitespace-nowrap"
-                    >
+                    <span className="text-xs font-medium hidden sm:inline whitespace-nowrap">
                       未保存
-                    </motion.span>
+                    </span>
                   </motion.div>
                   
                   {/* 重置按钮 */}

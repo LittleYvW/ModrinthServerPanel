@@ -1647,7 +1647,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <motion.div layout="position" className="flex items-center gap-2">
             {/* 展开/折叠控制（仅在表单模式下显示） */}
             {viewMode === 'form' && (
               <div className="hidden sm:flex items-center gap-1 mr-2">
@@ -1732,36 +1732,42 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
             </div>
             
             {/* 未保存状态与重置按钮容器 - 统一动画 */}
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {hasChanges && !saveSuccess && (
                 <motion.div
                   key="unsaved-group"
-                  initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 20, scale: 0.95 }}
-                  transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
-                  className="flex items-center gap-2"
+                  layout
+                  initial={{ opacity: 0, scale: 0.8, width: 0 }}
+                  animate={{ opacity: 1, scale: 1, width: 'auto' }}
+                  exit={{ opacity: 0, scale: 0.8, width: 0 }}
+                  transition={{ 
+                    type: 'spring',
+                    stiffness: 400,
+                    damping: 30,
+                    mass: 0.8,
+                    opacity: { duration: 0.15 }
+                  }}
+                  className="flex items-center gap-2 overflow-visible"
                 >
                   {/* 未保存指示 - 增强动画 */}
                   <motion.div 
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0 border border-amber-500/20"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0 border border-amber-500/20 whitespace-nowrap"
+                    initial={{ opacity: 0, x: -10 }}
                     animate={{ 
-                      borderColor: ['rgba(245, 158, 11, 0.1)', 'rgba(245, 158, 11, 0.4)', 'rgba(245, 158, 11, 0.1)'],
+                      opacity: 1, 
+                      x: 0,
                     }}
-                    transition={{ 
-                      duration: 2,
-                      ease: 'easeInOut',
-                      repeat: Infinity,
-                    }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ delay: 0.05, duration: 0.15 }}
                   >
                     <motion.div 
-                      className="w-2 h-2 rounded-full bg-amber-500"
+                      className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"
                       animate={{ 
-                        scale: [1, 1.2, 1],
-                        opacity: [1, 0.7, 1],
+                        scale: [1, 1.3, 1],
+                        opacity: [1, 0.6, 1],
                       }}
                       transition={{ 
-                        duration: 1.5,
+                        duration: 1.2,
                         ease: 'easeInOut',
                         repeat: Infinity,
                       }}
@@ -1773,8 +1779,13 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <motion.div
-                        whileHover={{ scale: 1.05, rotate: -10 }}
+                        initial={{ opacity: 0, rotate: -180 }}
+                        animate={{ opacity: 1, rotate: 0 }}
+                        exit={{ opacity: 0, rotate: 180 }}
+                        whileHover={{ scale: 1.1, rotate: -15 }}
                         whileTap={{ scale: 0.95 }}
+                        transition={{ delay: 0.08, duration: 0.2 }}
+                        className="flex-shrink-0"
                       >
                         <Button
                           variant="ghost"
@@ -1795,7 +1806,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
             </AnimatePresence>
             
             {/* 保存按钮 - 三态动画 */}
-            <div className="relative">
+            <motion.div layout="position" className="relative">
               <AnimatePresence mode="wait">
                 {saveSuccess ? (
                   /* 成功态 */
@@ -1931,8 +1942,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
         
         {/* 编辑器内容 */}

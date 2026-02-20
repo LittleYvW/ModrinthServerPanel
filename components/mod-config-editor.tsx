@@ -1732,70 +1732,39 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
             </div>
             
             {/* 未保存状态与重置按钮容器 - 统一动画 */}
-            <AnimatePresence initial={false}>
+            <AnimatePresence initial={false} mode="popLayout">
               {hasChanges && !saveSuccess && (
                 <motion.div
                   key="unsaved-group"
-                  layout
-                  initial={{ opacity: 0, scale: 0.8, width: 0 }}
-                  animate={{ opacity: 1, scale: 1, width: 'auto' }}
-                  exit={{ opacity: 0, scale: 0.8, width: 0 }}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
                   transition={{ 
-                    type: 'spring',
-                    stiffness: 400,
-                    damping: 30,
-                    mass: 0.8,
-                    opacity: { duration: 0.15 }
+                    duration: 0.25,
+                    ease: [0.25, 0.1, 0.25, 1]
                   }}
-                  className="flex items-center gap-2 overflow-visible"
+                  className="flex items-center gap-2"
                 >
-                  {/* 未保存指示 - 增强动画 */}
-                  <motion.div 
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0 border border-amber-500/20 whitespace-nowrap"
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ 
-                      opacity: 1, 
-                      x: 0,
-                    }}
-                    exit={{ opacity: 0, x: -10 }}
-                    transition={{ delay: 0.05, duration: 0.15 }}
-                  >
-                    <motion.div 
-                      className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"
-                      animate={{ 
-                        scale: [1, 1.3, 1],
-                        opacity: [1, 0.6, 1],
-                      }}
-                      transition={{ 
-                        duration: 1.2,
-                        ease: 'easeInOut',
-                        repeat: Infinity,
-                      }}
-                    />
+                  {/* 未保存指示 */}
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0 border border-amber-500/20 whitespace-nowrap">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
                     <span className="text-xs font-medium whitespace-nowrap">未保存</span>
-                  </motion.div>
+                  </div>
                   
                   {/* 重置按钮 */}
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <motion.div
-                        initial={{ opacity: 0, rotate: -180 }}
-                        animate={{ opacity: 1, rotate: 0 }}
-                        exit={{ opacity: 0, rotate: 180 }}
-                        whileHover={{ scale: 1.1, rotate: -15 }}
-                        whileTap={{ scale: 0.95 }}
-                        transition={{ delay: 0.08, duration: 0.2 }}
-                        className="flex-shrink-0"
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleReset}
+                        className="h-8 w-8 text-[#707070] hover:text-amber-400 hover:bg-amber-500/10 flex-shrink-0 transition-colors"
                       >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleReset}
-                          className="h-8 w-8 text-[#707070] hover:text-amber-400 hover:bg-amber-500/10 flex-shrink-0 transition-colors"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                        </Button>
-                      </motion.div>
+                        <RotateCcw className="w-4 h-4" />
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>重置更改</p>
@@ -1806,7 +1775,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
             </AnimatePresence>
             
             {/* 保存按钮 - 三态动画 */}
-            <motion.div layout="position" className="relative">
+            <div className="relative">
               <AnimatePresence mode="wait">
                 {saveSuccess ? (
                   /* 成功态 */
@@ -1942,7 +1911,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.div>
+            </div>
           </motion.div>
         </div>
         

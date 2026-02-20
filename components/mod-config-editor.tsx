@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Plus,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -1538,7 +1539,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         setOriginalContent(finalContent);
         setHasChanges(false);
         setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 2000);
+        // 延长成功状态显示时间，让用户有足够时间感知
+        setTimeout(() => setSaveSuccess(false), 2500);
         onSave?.();
       } else {
         setError(data.error || 'Failed to save file');
@@ -1729,51 +1731,60 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
               </Tooltip>
             </div>
             
-            {/* 保存状态指示 - 已保存 */}
-            <AnimatePresence mode="wait">
-              {saveSuccess && (
-                <motion.div
-                  key="success"
-                  initial={{ opacity: 0, scale: 0.8, x: 10 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.8, x: 10 }}
-                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 flex-shrink-0"
-                >
-                  <Check className="w-4 h-4" />
-                  <span className="text-xs font-medium whitespace-nowrap">已保存</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            
             {/* 未保存状态与重置按钮容器 - 统一动画 */}
             <AnimatePresence>
               {hasChanges && !saveSuccess && (
                 <motion.div
                   key="unsaved-group"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                  initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                  transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
                   className="flex items-center gap-2"
                 >
-                  {/* 未保存指示 */}
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  {/* 未保存指示 - 增强动画 */}
+                  <motion.div 
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0 border border-amber-500/20"
+                    animate={{ 
+                      borderColor: ['rgba(245, 158, 11, 0.1)', 'rgba(245, 158, 11, 0.4)', 'rgba(245, 158, 11, 0.1)'],
+                    }}
+                    transition={{ 
+                      duration: 2,
+                      ease: 'easeInOut',
+                      repeat: Infinity,
+                    }}
+                  >
+                    <motion.div 
+                      className="w-2 h-2 rounded-full bg-amber-500"
+                      animate={{ 
+                        scale: [1, 1.2, 1],
+                        opacity: [1, 0.7, 1],
+                      }}
+                      transition={{ 
+                        duration: 1.5,
+                        ease: 'easeInOut',
+                        repeat: Infinity,
+                      }}
+                    />
                     <span className="text-xs font-medium whitespace-nowrap">未保存</span>
-                  </div>
+                  </motion.div>
                   
                   {/* 重置按钮 */}
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleReset}
-                        className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a] flex-shrink-0"
+                      <motion.div
+                        whileHover={{ scale: 1.05, rotate: -10 }}
+                        whileTap={{ scale: 0.95 }}
                       >
-                        <RotateCcw className="w-4 h-4" />
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleReset}
+                          className="h-8 w-8 text-[#707070] hover:text-amber-400 hover:bg-amber-500/10 flex-shrink-0 transition-colors"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </Button>
+                      </motion.div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>重置更改</p>
@@ -1783,35 +1794,144 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
               )}
             </AnimatePresence>
             
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={saving || !hasChanges}
-                  className={cn(
-                    'h-8 px-3 bg-emerald-500 hover:bg-emerald-600 text-black font-medium',
-                    'disabled:opacity-50 disabled:cursor-not-allowed'
-                  )}
-                >
-                  {saving ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+            {/* 保存按钮 - 三态动画 */}
+            <div className="relative">
+              <AnimatePresence mode="wait">
+                {saveSuccess ? (
+                  /* 成功态 */
+                  <motion.div
+                    key="success-btn"
+                    initial={{ opacity: 0, scale: 0.9, y: 5 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                    transition={{ 
+                      duration: 0.25, 
+                      ease: [0.34, 1.56, 0.64, 1] // bounce easing
+                    }}
+                  >
+                    <Button
+                      variant="default"
+                      size="sm"
+                      disabled
+                      className="h-8 px-3 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium cursor-default"
                     >
-                      <Save className="w-4 h-4" />
-                    </motion.div>
-                  ) : (
-                    <Save className="w-4 h-4 mr-1.5" />
-                  )}
-                  保存
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>保存配置文件</p>
-              </TooltipContent>
-            </Tooltip>
+                      <motion.div
+                        initial={{ scale: 0, rotate: -45 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ 
+                          delay: 0.05,
+                          type: 'spring',
+                          stiffness: 500,
+                          damping: 15
+                        }}
+                      >
+                        <Check className="w-4 h-4 mr-1.5" />
+                      </motion.div>
+                      <span>已保存</span>
+                    </Button>
+                    
+                    {/* 成功波纹扩散效果 */}
+                    <motion.div
+                      className="absolute inset-0 rounded-lg border-2 border-emerald-500/50"
+                      initial={{ opacity: 1, scale: 1 }}
+                      animate={{ opacity: 0, scale: 1.6 }}
+                      transition={{ duration: 0.5, ease: 'easeOut' }}
+                    />
+                  </motion.div>
+                ) : saving ? (
+                  /* 保存中态 */
+                  <motion.div
+                    key="saving-btn"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <Button
+                      variant="default"
+                      size="sm"
+                      disabled
+                      className="h-8 px-3 bg-emerald-500/80 text-black font-medium cursor-wait"
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ 
+                          duration: 1.5, 
+                          ease: 'linear', 
+                          repeat: Infinity 
+                        }}
+                        className="mr-1.5"
+                      >
+                        <Loader2 className="w-4 h-4" />
+                      </motion.div>
+                      <motion.span
+                        initial={{ opacity: 0, x: -5 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 }}
+                      >
+                        保存中
+                      </motion.span>
+                      {/* 进度条动画 */}
+                      <motion.div
+                        className="absolute bottom-0 left-0 h-0.5 bg-black/30"
+                        initial={{ width: '0%' }}
+                        animate={{ 
+                          width: ['0%', '40%', '70%', '90%'],
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          ease: 'easeInOut',
+                          times: [0, 0.3, 0.6, 1],
+                          repeat: Infinity
+                        }}
+                      />
+                    </Button>
+                  </motion.div>
+                ) : (
+                  /* 初始态 */
+                  <motion.div
+                    key="save-btn"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    whileHover={{ scale: hasChanges ? 1.02 : 1 }}
+                    whileTap={{ scale: hasChanges ? 0.98 : 1 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={handleSave}
+                          disabled={!hasChanges}
+                          className={cn(
+                            'h-8 px-3 font-medium transition-all duration-200 relative overflow-hidden',
+                            hasChanges 
+                              ? 'bg-emerald-500 hover:bg-emerald-600 text-black' 
+                              : 'bg-[#2a2a2a] text-[#707070] cursor-not-allowed'
+                          )}
+                        >
+                          {/* 悬停时的微光效果 */}
+                          {hasChanges && (
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full"
+                              whileHover={{ x: '100%' }}
+                              transition={{ duration: 0.5, ease: 'easeInOut' }}
+                            />
+                          )}
+                          <Save className="w-4 h-4 mr-1.5" />
+                          保存
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{hasChanges ? '保存配置文件' : '没有需要保存的更改'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
         

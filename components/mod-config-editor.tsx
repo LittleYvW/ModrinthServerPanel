@@ -1846,12 +1846,79 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     });
   }, []);
   
+  // 收集所有变更的配置项
+  const collectChanges = useCallback((): Array<{ path: string; value: unknown }> => {
+    if (!originalParsed || !parsed) return [];
+    
+    const changes: Array<{ path: string; value: unknown }> = [];
+    
+    const findChanges = (current: unknown, original: unknown, currentPath: string) => {
+      if (current === original) return;
+      
+      if (typeof current !== typeof original) {
+        // 类型不同，整个值都变了
+        changes.push({ path: currentPath, value: current });
+        return;
+      }
+      
+      if (typeof current !== 'object' || current === null || original === null) {
+        // 基本类型且值不同
+        if (current !== original) {
+          changes.push({ path: currentPath, value: current });
+        }
+        return;
+      }
+      
+      if (Array.isArray(current) && Array.isArray(original)) {
+        // 数组：检查每个元素
+        const maxLen = Math.max(current.length, original.length);
+        for (let i = 0; i < maxLen; i++) {
+          const itemPath = `${currentPath}[${i}]`;
+          if (i >= original.length) {
+            // 新增元素
+            changes.push({ path: itemPath, value: current[i] });
+          } else if (i >= current.length) {
+            // 删除元素 - 标记为 null，在替换时会被特殊处理
+            changes.push({ path: itemPath, value: undefined });
+          } else {
+            findChanges(current[i], original[i], itemPath);
+          }
+        }
+        return;
+      }
+      
+      // 对象：检查每个属性
+      const currentObj = current as Record<string, unknown>;
+      const originalObj = original as Record<string, unknown>;
+      const allKeys = new Set([...Object.keys(currentObj), ...Object.keys(originalObj)]);
+      
+      for (const key of allKeys) {
+        const keyPath = currentPath ? `${currentPath}.${key}` : key;
+        if (!(key in originalObj)) {
+          // 新增属性
+          changes.push({ path: keyPath, value: currentObj[key] });
+        } else if (!(key in currentObj)) {
+          // 删除属性
+          changes.push({ path: keyPath, value: undefined });
+        } else {
+          findChanges(currentObj[key], originalObj[key], keyPath);
+        }
+      }
+    };
+    
+    findChanges(parsed, originalParsed, '');
+    return changes;
+  }, [originalParsed, parsed]);
+
   // 保存文件
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     
     try {
+      // 收集所有变更
+      const changes = collectChanges();
+      
       // 使用 finalPreviewContent 作为要保存的内容（反映当前编辑状态）
       // 如果 finalPreviewContent 为空（如 TOML 还在异步生成中），则实时生成
       let finalContent = finalPreviewContent;
@@ -1878,6 +1945,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
           path: filePath,
           content: finalContent,
           format: fileType,
+          useSmartReplace: true,
+          changes: changes,
         }),
       });
       
@@ -1894,9 +1963,13 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
           // 延长成功状态显示时间，让用户有足够时间感知
           setTimeout(() => setSaveSuccess(false), 2500);
         }, 300);
-        // 更新内容状态
-        setContent(finalContent);
-        setOriginalContent(finalContent);
+        // 更新内容状态 - 重新读取文件以获取实际保存的内容（包含注释）
+        const refreshRes = await fetch(`/api/mod-configs/file?path=${encodeURIComponent(filePath)}`);
+        const refreshData = await refreshRes.json();
+        if (refreshData.success) {
+          setContent(refreshData.content);
+          setOriginalContent(refreshData.content);
+        }
         setHasChanges(false);
         onSave?.();
       } else {

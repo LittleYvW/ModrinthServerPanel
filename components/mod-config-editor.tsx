@@ -572,65 +572,100 @@ const ConfigItemEditor = ({
             isExpanded ? 'border-opacity-50 shadow-lg shadow-black/20' : 'hover:border-opacity-30'
           )}
         >
-          {/* 头部 - 可点击展开 */}
-          <button
-            onClick={onToggle}
-            className="w-full px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
-          >
-            <div className="flex items-start gap-3">
-              {/* 展开指示器 */}
-              <motion.div
-                animate={{ rotate: isExpanded ? 90 : 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex-shrink-0 text-[#707070] mt-1"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </motion.div>
-              
-              {/* 类型图标 */}
-              <div className={cn('flex-shrink-0 mt-1', getTypeColor(config.type))}>
-                <ValueTypeIcon type={config.type} />
-              </div>
-              
-              {/* 键名和描述 */}
-              <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                {/* 键名和数量标签 */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={cn(
-                    'font-semibold text-base',
-                    config.depth === 0 ? 'text-white' : 'text-[#b0b0b0]'
-                  )}>
-                    {/* 检测是否为数组中的对象元素（路径以 [数字] 结尾） */}
-                    {/^\[\d+\]$/.test(config.key) ? `项目 ${config.key.slice(1, -1)}` : config.key}
-                  </span>
-                  <Badge 
-                    variant="outline" 
-                    className={cn(
-                      'text-xs px-2 py-0 h-5 border-0 font-normal flex-shrink-0',
-                      getTypeBgColor(config.type),
-                      getTypeColor(config.type)
-                    )}
-                  >
-                    {childrenCount} 项
-                  </Badge>
+          {/* 头部 - 可点击展开，使用 flex 布局容纳删除按钮 */}
+          <div className="flex items-center">
+            <button
+              onClick={onToggle}
+              className="flex-1 px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
+            >
+              <div className="flex items-start gap-3">
+                {/* 展开指示器 */}
+                <motion.div
+                  animate={{ rotate: isExpanded ? 90 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex-shrink-0 text-[#707070] mt-1"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </motion.div>
+                
+                {/* 类型图标 */}
+                <div className={cn('flex-shrink-0 mt-1', getTypeColor(config.type))}>
+                  <ValueTypeIcon type={config.type} />
                 </div>
                 
-                {/* 描述 - 完整展示，保留换行 */}
-                {descriptionLines.length > 0 && (
-                  <div className="space-y-1 mt-1">
-                    {descriptionLines.map((line, index) => (
-                      <p 
-                        key={index} 
-                        className="text-sm text-[#808080] leading-relaxed whitespace-pre-wrap break-words text-left"
-                      >
-                        {line ? highlightNumbersInText(line) : '\u00A0'}
-                      </p>
-                    ))}
+                {/* 键名和描述 */}
+                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                  {/* 键名和数量标签 */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={cn(
+                      'font-semibold text-base',
+                      config.depth === 0 ? 'text-white' : 'text-[#b0b0b0]'
+                    )}>
+                      {/* 检测是否为数组中的对象元素（路径以 [数字] 结尾） */}
+                      {/^\[\d+\]$/.test(config.key) ? `项目 ${config.key.slice(1, -1)}` : config.key}
+                    </span>
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        'text-xs px-2 py-0 h-5 border-0 font-normal flex-shrink-0',
+                        getTypeBgColor(config.type),
+                        getTypeColor(config.type)
+                      )}
+                    >
+                      {childrenCount} 项
+                    </Badge>
                   </div>
-                )}
+                  
+                  {/* 描述 - 完整展示，保留换行 */}
+                  {descriptionLines.length > 0 && (
+                    <div className="space-y-1 mt-1">
+                      {descriptionLines.map((line, index) => (
+                        <p 
+                          key={index} 
+                          className="text-sm text-[#808080] leading-relaxed whitespace-pre-wrap break-words text-left"
+                        >
+                          {line ? highlightNumbersInText(line) : '\u00A0'}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+            
+            {/* 数组元素删除按钮 - 只有最后一项可以删除 */}
+            {isArrayItem && onArrayChange && (
+              <motion.button
+                whileHover={{ scale: isLastArrayItem ? 1.1 : 1 }}
+                whileTap={{ scale: isLastArrayItem ? 0.9 : 1 }}
+                onClick={() => {
+                  if (!isLastArrayItem) return;
+                  // 从路径中提取索引，如 "parent[0]" -> 0
+                  const match = config.path.match(/\[(\d+)\]$/);
+                  if (match) {
+                    const parentPath = config.path.slice(0, config.path.lastIndexOf('['));
+                    onArrayChange(parentPath, 'remove', parseInt(match[1], 10));
+                  }
+                }}
+                className={cn(
+                  'p-2 mr-3 rounded-md flex-shrink-0',
+                  isLastArrayItem 
+                    ? 'text-[#707070] hover:text-red-400 hover:bg-red-500/10 transition-colors duration-200' 
+                    : 'pointer-events-none bg-transparent'
+                )}
+                title={isLastArrayItem ? "删除此项" : undefined}
+              >
+                <motion.span
+                  initial={isLastArrayItem ? { opacity: 0, scale: 0.5 } : false}
+                  animate={isLastArrayItem ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.5 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+                  className="flex items-center justify-center"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </motion.span>
+              </motion.button>
+            )}
+          </div>
           
           {/* 子项展开区域 */}
           <AnimatePresence>

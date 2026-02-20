@@ -1635,57 +1635,90 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
       variants={fadeIn}
       className="flex flex-col h-full"
     >
-        {/* 工具栏 */}
-        <div className="flex items-center justify-between p-4 border-b border-[#2a2a2a] bg-[#151515]/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10">
+        {/* 工具栏 - 响应式布局优化 */}
+        <div 
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-[#2a2a2a] bg-[#151515]/50"
+        >
+          {/* 左侧：文件信息 */}
+          <motion.div 
+            layout
+            className="flex items-center gap-3 min-w-0"
+          >
+            <div className="p-2 rounded-lg bg-emerald-500/10 flex-shrink-0">
               <FileTypeIcon type={fileType} className="w-5 h-5 text-emerald-500" />
             </div>
-            <div className="min-w-0">
-              <h3 className="font-medium text-white text-sm truncate">{filePath}</h3>
-              <p className="text-xs text-[#707070]">{modName}</p>
+            <div className="min-w-0 overflow-hidden">
+              <motion.h3 
+                layout
+                className="font-medium text-white text-sm truncate"
+              >
+                {filePath}
+              </motion.h3>
+              <motion.p layout className="text-xs text-[#707070]">{modName}</motion.p>
             </div>
-          </div>
+          </motion.div>
           
-          <motion.div layout="position" className="flex items-center gap-2">
+          {/* 右侧：操作按钮组 - 响应式布局容器 */}
+          <motion.div 
+            layout
+            className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap justify-end"
+          >
             {/* 展开/折叠控制（仅在表单模式下显示） */}
-            {viewMode === 'form' && (
-              <div className="hidden sm:flex items-center gap-1 mr-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={expandAll}
-                      className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a]"
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>展开全部</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={collapseAll}
-                      className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a]"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>折叠全部</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            )}
+            <AnimatePresence mode="popLayout">
+              {viewMode === 'form' && (
+                <motion.div 
+                  key="expand-controls"
+                  layout
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2, ease: easings.standard }}
+                  className="hidden sm:flex items-center gap-1"
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={expandAll}
+                        className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a]"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>展开全部</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={collapseAll}
+                        className="h-8 w-8 text-[#707070] hover:text-white hover:bg-[#2a2a2a]"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>折叠全部</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {/* 分隔线 */}
+                  <motion.div 
+                    layout
+                    className="w-px h-5 bg-[#2a2a2a] mx-1" 
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
             
-            {/* 视图切换 */}
-            <div className="flex bg-[#1a1a1a] rounded-lg p-0.5 border border-[#2a2a2a]">
+            {/* 视图切换 - 响应式：窄屏时仅显示图标 */}
+            <motion.div 
+              layout
+              className="flex bg-[#1a1a1a] rounded-lg p-0.5 border border-[#2a2a2a]"
+            >
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -1693,14 +1726,19 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                     size="sm"
                     onClick={() => setViewMode('form')}
                     className={cn(
-                      'h-7 px-2 text-xs',
+                      'h-7 px-2 text-xs flex items-center gap-1.5 transition-all duration-200',
                       viewMode === 'form' 
                         ? 'bg-[#262626] text-white' 
                         : 'text-[#707070] hover:text-white'
                     )}
                   >
-                    <Eye className="w-3.5 h-3.5 mr-1" />
-                    表单
+                    <Eye className="w-3.5 h-3.5 flex-shrink-0" />
+                    <motion.span
+                      layout
+                      className="hidden sm:inline whitespace-nowrap"
+                    >
+                      表单
+                    </motion.span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -1715,56 +1753,72 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                     size="sm"
                     onClick={() => setViewMode('code')}
                     className={cn(
-                      'h-7 px-2 text-xs',
+                      'h-7 px-2 text-xs flex items-center gap-1.5 transition-all duration-200',
                       viewMode === 'code' 
                         ? 'bg-[#262626] text-white' 
                         : 'text-[#707070] hover:text-white'
                     )}
                   >
-                    <Code className="w-3.5 h-3.5 mr-1" />
-                    代码
+                    <Code className="w-3.5 h-3.5 flex-shrink-0" />
+                    <motion.span
+                      layout
+                      className="hidden sm:inline whitespace-nowrap"
+                    >
+                      代码
+                    </motion.span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>源代码编辑模式</p>
                 </TooltipContent>
               </Tooltip>
-            </div>
+            </motion.div>
             
-            {/* 未保存状态与重置按钮容器 - 统一动画 */}
+            {/* 未保存状态与重置按钮容器 - 响应式布局动画 */}
             <AnimatePresence initial={false} mode="popLayout">
               {hasChanges && !saveSuccess && (
                 <motion.div
                   key="unsaved-group"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
+                  layout
+                  initial={{ opacity: 0, scale: 0.8, width: 0 }}
+                  animate={{ opacity: 1, scale: 1, width: 'auto' }}
+                  exit={{ opacity: 0, scale: 0.8, width: 0 }}
                   transition={{ 
                     duration: 0.25,
-                    ease: [0.25, 0.1, 0.25, 1]
+                    ease: easings.standard
                   }}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1.5 sm:gap-2 overflow-hidden"
                 >
-                  {/* 未保存指示 */}
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0 border border-amber-500/20 whitespace-nowrap">
-                    <span className="relative flex h-2 w-2">
+                  {/* 未保存指示 - 响应式：窄屏仅显示图标 */}
+                  <motion.div 
+                    layout
+                    className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 flex-shrink-0 border border-amber-500/20"
+                  >
+                    <span className="relative flex h-2 w-2 flex-shrink-0">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                     </span>
-                    <span className="text-xs font-medium whitespace-nowrap">未保存</span>
-                  </div>
+                    <motion.span 
+                      layout
+                      className="text-xs font-medium hidden sm:inline whitespace-nowrap"
+                    >
+                      未保存
+                    </motion.span>
+                  </motion.div>
                   
                   {/* 重置按钮 */}
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleReset}
-                        className="h-8 w-8 text-[#707070] hover:text-amber-400 hover:bg-amber-500/10 flex-shrink-0 transition-colors"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </Button>
+                      <motion.div layout>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleReset}
+                          className="h-8 w-8 text-[#707070] hover:text-amber-400 hover:bg-amber-500/10 flex-shrink-0 transition-colors"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </Button>
+                      </motion.div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>重置更改</p>
@@ -1774,26 +1828,30 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
               )}
             </AnimatePresence>
             
-            {/* 保存按钮 - 三态动画 */}
-            <div className="relative">
+            {/* 保存按钮 - 响应式三态动画 */}
+            <motion.div 
+              layout
+              className="relative"
+            >
               <AnimatePresence mode="wait">
                 {saveSuccess ? (
                   /* 成功态 */
                   <motion.div
                     key="success-btn"
+                    layout
                     initial={{ opacity: 0, scale: 0.9, y: 5 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -5 }}
                     transition={{ 
                       duration: 0.25, 
-                      ease: [0.34, 1.56, 0.64, 1] // bounce easing
+                      ease: [0.34, 1.56, 0.64, 1]
                     }}
                   >
                     <Button
                       variant="default"
                       size="sm"
                       disabled
-                      className="h-8 px-3 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium cursor-default"
+                      className="h-8 px-2 sm:px-3 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium cursor-default"
                     >
                       <motion.div
                         initial={{ scale: 0, rotate: -45 }}
@@ -1805,9 +1863,9 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                           damping: 15
                         }}
                       >
-                        <Check className="w-4 h-4 mr-1.5" />
+                        <Check className="w-4 h-4 mr-0 sm:mr-1.5" />
                       </motion.div>
-                      <span>已保存</span>
+                      <span className="hidden sm:inline">已保存</span>
                     </Button>
                     
                     {/* 成功波纹扩散效果 */}
@@ -1822,6 +1880,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   /* 保存中态 */
                   <motion.div
                     key="saving-btn"
+                    layout
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -1831,7 +1890,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                       variant="default"
                       size="sm"
                       disabled
-                      className="h-8 px-3 bg-emerald-500/80 text-black font-medium cursor-wait"
+                      className="h-8 px-2 sm:px-3 bg-emerald-500/80 text-black font-medium cursor-wait"
                     >
                       <motion.div
                         animate={{ rotate: 360 }}
@@ -1840,7 +1899,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                           ease: 'linear', 
                           repeat: Infinity 
                         }}
-                        className="mr-1.5"
+                        className="mr-0 sm:mr-1.5"
                       >
                         <Loader2 className="w-4 h-4" />
                       </motion.div>
@@ -1848,6 +1907,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                         initial={{ opacity: 0, x: -5 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 }}
+                        className="hidden sm:inline"
                       >
                         保存中
                       </motion.span>
@@ -1871,6 +1931,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   /* 初始态 */
                   <motion.div
                     key="save-btn"
+                    layout
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.98 }}
@@ -1886,7 +1947,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                           onClick={handleSave}
                           disabled={!hasChanges}
                           className={cn(
-                            'h-8 px-3 font-medium transition-all duration-200 relative overflow-hidden',
+                            'h-8 px-2 sm:px-3 font-medium transition-all duration-200 relative overflow-hidden',
                             hasChanges 
                               ? 'bg-emerald-500 hover:bg-emerald-600 text-black' 
                               : 'bg-[#2a2a2a] text-[#707070] cursor-not-allowed'
@@ -1900,8 +1961,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                               transition={{ duration: 0.5, ease: 'easeInOut' }}
                             />
                           )}
-                          <Save className="w-4 h-4 mr-1.5" />
-                          保存
+                          <Save className="w-4 h-4 mr-0 sm:mr-1.5" />
+                          <span className="hidden sm:inline">保存</span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -1911,7 +1972,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+            </motion.div>
           </motion.div>
         </div>
         

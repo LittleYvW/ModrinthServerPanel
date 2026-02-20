@@ -1255,6 +1255,51 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     return true;
   }, []);
   
+  // 根据 parsed 生成代码内容（用于预览）
+  const previewContent = useMemo(() => {
+    if (!parsed) return '';
+    
+    if (fileType === 'toml') {
+      // TOML 需要异步导入，这里先用 JSON.stringify 作为占位
+      // 实际使用时在 useEffect 中更新
+      return '';
+    } else if (fileType === 'json5') {
+      return JSON.stringify(parsed, null, 2);
+    } else {
+      return JSON.stringify(parsed, null, 2);
+    }
+  }, [parsed, fileType]);
+  
+  // 异步生成 TOML 预览内容
+  const [tomlPreviewContent, setTomlPreviewContent] = useState<string>('');
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  
+  useEffect(() => {
+    const generateTomlPreview = async () => {
+      if (fileType === 'toml' && parsed) {
+        setIsGeneratingPreview(true);
+        try {
+          const { default: TOML } = await import('@iarna/toml');
+          const content = TOML.stringify(parsed as Record<string, unknown>);
+          setTomlPreviewContent(content);
+        } catch {
+          setTomlPreviewContent('');
+        } finally {
+          setIsGeneratingPreview(false);
+        }
+      }
+    };
+    generateTomlPreview();
+  }, [parsed, fileType]);
+  
+  // 获取最终预览内容
+  const finalPreviewContent = useMemo(() => {
+    if (fileType === 'toml') {
+      return tomlPreviewContent;
+    }
+    return previewContent;
+  }, [previewContent, tomlPreviewContent, fileType]);
+  
   // 监听 parsed 变化，与原始内容比较以确定是否有更改
   useEffect(() => {
     const compareContent = async () => {
@@ -1507,20 +1552,23 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     setError(null);
     
     try {
-      // 根据类型生成内容
-      let finalContent = content;
-      if (viewMode === 'form' && parsed) {
-        if (fileType === 'json') {
-          finalContent = JSON.stringify(parsed, null, 2);
-        } else if (fileType === 'json5') {
-          // JSON5 尝试保留注释（简化处理：使用原始内容）
+      // 使用 finalPreviewContent 作为要保存的内容（反映当前编辑状态）
+      // 如果 finalPreviewContent 为空（如 TOML 还在异步生成中），则实时生成
+      let finalContent = finalPreviewContent;
+      
+      if (!finalContent && parsed) {
+        // 备用生成逻辑
+        if (fileType === 'json' || fileType === 'json5') {
           finalContent = JSON.stringify(parsed, null, 2);
         } else if (fileType === 'toml') {
-          // TOML 需要重新序列化
           const { default: TOML } = await import('@iarna/toml');
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          finalContent = TOML.stringify(parsed as any);
+          finalContent = TOML.stringify(parsed as Record<string, unknown>);
         }
+      }
+      
+      // 如果没有生成内容或解析失败，使用原始内容
+      if (!finalContent) {
+        finalContent = content;
       }
       
       const res = await fetch('/api/mod-configs/file', {
@@ -1536,6 +1584,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
       const data = await res.json();
       
       if (data.success) {
+        // 更新所有相关状态，确保一致性
+        setContent(finalContent);
         setOriginalContent(finalContent);
         setHasChanges(false);
         setSaveSuccess(true);
@@ -1942,28 +1992,46 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                           variant="default"
                           size="sm"
                           onClick={handleSave}
-                          disabled={!hasChanges}
+                          disabled={!hasChanges || isGeneratingPreview}
                           className={cn(
                             'h-8 px-2 sm:px-3 font-medium transition-all duration-200 relative overflow-hidden',
-                            hasChanges 
+                            hasChanges && !isGeneratingPreview
                               ? 'bg-emerald-500 hover:bg-emerald-600 text-black' 
                               : 'bg-[#2a2a2a] text-[#707070] cursor-not-allowed'
                           )}
                         >
                           {/* 悬停时的微光效果 */}
-                          {hasChanges && (
+                          {hasChanges && !isGeneratingPreview && (
                             <motion.div
                               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full"
                               whileHover={{ x: '100%' }}
                               transition={{ duration: 0.5, ease: 'easeInOut' }}
                             />
                           )}
-                          <Save className="w-4 h-4 mr-0 sm:mr-1.5" />
-                          <span className="hidden sm:inline">保存</span>
+                          {isGeneratingPreview ? (
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1.5, ease: 'linear', repeat: Infinity }}
+                              className="mr-0 sm:mr-1.5"
+                            >
+                              <Loader2 className="w-4 h-4" />
+                            </motion.div>
+                          ) : (
+                            <Save className="w-4 h-4 mr-0 sm:mr-1.5" />
+                          )}
+                          <span className="hidden sm:inline">
+                            {isGeneratingPreview ? '生成中' : '保存'}
+                          </span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{hasChanges ? '保存配置文件' : '没有需要保存的更改'}</p>
+                        <p>
+                          {isGeneratingPreview 
+                            ? '正在生成预览内容...' 
+                            : hasChanges 
+                              ? '保存配置文件' 
+                              : '没有需要保存的更改'}
+                        </p>
                       </TooltipContent>
                     </Tooltip>
                   </motion.div>
@@ -2073,7 +2141,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
               className="h-full overflow-hidden bg-[#0d0d0d] absolute inset-0"
             >
               <ScrollArea className="h-full w-full" type="always">
-                <CodePreview content={content} type={fileType} />
+                <CodePreview content={finalPreviewContent} type={fileType} />
               </ScrollArea>
             </motion.div>
           )}

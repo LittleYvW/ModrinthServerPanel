@@ -1644,12 +1644,156 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-6">
+        {/* 加载动画容器 */}
+        <div className="relative flex items-center justify-center">
+          {/* 外层脉冲环 */}
+          <motion.div
+            className="absolute w-20 h-20 rounded-full border-2 border-emerald-500/20"
+            animate={{
+              scale: [1, 1.5, 1.5],
+              opacity: [0.5, 0, 0],
+            }}
+            transition={{
+              duration: 2,
+              ease: 'easeOut',
+              repeat: Infinity,
+              repeatDelay: 0.5,
+            }}
+          />
+          
+          {/* 中层脉冲环 */}
+          <motion.div
+            className="absolute w-20 h-20 rounded-full border-2 border-emerald-500/30"
+            animate={{
+              scale: [1, 1.3, 1.3],
+              opacity: [0.7, 0, 0],
+            }}
+            transition={{
+              duration: 2,
+              ease: 'easeOut',
+              repeat: Infinity,
+              repeatDelay: 0.5,
+              delay: 0.3,
+            }}
+          />
+          
+          {/* 内层背景光晕 */}
+          <motion.div
+            className="absolute w-16 h-16 rounded-full bg-emerald-500/10"
+            animate={{
+              scale: [0.8, 1.1, 0.8],
+              opacity: [0.3, 0.6, 0.3],
+            }}
+            transition={{
+              duration: 2,
+              ease: 'easeInOut',
+              repeat: Infinity,
+            }}
+          />
+          
+          {/* 中心文件图标容器 */}
+          <motion.div
+            className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 
+                       border border-emerald-500/30 flex items-center justify-center backdrop-blur-sm"
+            animate={{
+              boxShadow: [
+                '0 0 0 0 rgba(16, 185, 129, 0)',
+                '0 0 20px 5px rgba(16, 185, 129, 0.15)',
+                '0 0 0 0 rgba(16, 185, 129, 0)',
+              ],
+            }}
+            transition={{
+              duration: 2,
+              ease: 'easeInOut',
+              repeat: Infinity,
+            }}
+          >
+            {/* 旋转的图标 */}
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 3, ease: 'linear', repeat: Infinity }}
+            >
+              <FileTypeIcon 
+                type={fileType} 
+                className="w-7 h-7 text-emerald-400" 
+              />
+            </motion.div>
+            
+            {/* 右上角的装饰点 */}
+            <motion.div
+              className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400"
+              animate={{
+                scale: [0.8, 1.2, 0.8],
+                opacity: [0.6, 1, 0.6],
+              }}
+              transition={{
+                duration: 1.5,
+                ease: 'easeInOut',
+                repeat: Infinity,
+              }}
+            />
+          </motion.div>
+        </div>
+        
+        {/* 文字提示 */}
+        <div className="flex flex-col items-center gap-2">
+          <motion.div
+            className="flex items-center gap-1 text-emerald-400/80 text-sm font-medium"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.3 }}
+          >
+            <span>正在加载</span>
+            <motion.span
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
+            >
+              ·
+            </motion.span>
+            <motion.span
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+            >
+              ·
+            </motion.span>
+            <motion.span
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
+            >
+              ·
+            </motion.span>
+          </motion.div>
+          
+          {/* 文件路径提示 */}
+          <motion.p
+            className="text-xs text-[#707070] max-w-[300px] truncate px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.3 }}
+          >
+            {filePath}
+          </motion.p>
+        </div>
+        
+        {/* 底部进度条 */}
         <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+          className="w-32 h-0.5 bg-[#2a2a2a] rounded-full overflow-hidden"
+          initial={{ opacity: 0, scaleX: 0.8 }}
+          animate={{ opacity: 1, scaleX: 1 }}
+          transition={{ delay: 0.4, duration: 0.3 }}
         >
-          <FileCode className="w-8 h-8 text-emerald-500" />
+          <motion.div
+            className="h-full bg-gradient-to-r from-transparent via-emerald-500 to-transparent"
+            animate={{
+              x: ['-100%', '100%'],
+            }}
+            transition={{
+              duration: 1.5,
+              ease: 'easeInOut',
+              repeat: Infinity,
+            }}
+          />
         </motion.div>
       </div>
     );

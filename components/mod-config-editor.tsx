@@ -417,6 +417,8 @@ interface ConfigItemEditorProps {
   allConfigValues?: ConfigValue[];
   isArrayItem?: boolean;
   isLastArrayItem?: boolean;
+  isModified?: boolean;
+  checkModified?: (path: string) => boolean;
 }
 
 const ConfigItemEditor = ({ 
@@ -431,7 +433,9 @@ const ConfigItemEditor = ({
   toggleExpanded = () => {},
   allConfigValues = [],
   isArrayItem = false,
-  isLastArrayItem = false
+  isLastArrayItem = false,
+  isModified = false,
+  checkModified = () => false
 }: ConfigItemEditorProps) => {
   const [localValue, setLocalValue] = useState(value);
   const [isEditing, setIsEditing] = useState(false);
@@ -567,11 +571,16 @@ const ConfigItemEditor = ({
         {/* 父级项 - 卡片样式 */}
         <div 
           className={cn(
-            'rounded-lg border transition-all duration-200 overflow-hidden',
+            'rounded-lg border transition-all duration-200 overflow-hidden relative',
             getTypeBgColor(config.type),
-            isExpanded ? 'border-opacity-50 shadow-lg shadow-black/20' : 'hover:border-opacity-30'
+            isExpanded ? 'border-opacity-50 shadow-lg shadow-black/20' : 'hover:border-opacity-30',
+            isModified && 'ring-1 ring-amber-500/30 border-amber-500/30'
           )}
         >
+          {/* 未保存指示器 */}
+          {isModified && (
+            <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-amber-500" />
+          )}
           {/* 头部 - 可点击展开，使用 flex 布局容纳删除按钮 */}
           <div className="flex items-center">
             <button
@@ -725,6 +734,8 @@ const ConfigItemEditor = ({
                           allConfigValues,
                           isArrayItem: isArray,
                           isLastArrayItem: isLastItem,
+                          isModified: checkModified(childConfig.path),
+                          checkModified,
                         };
                         
                         // 只为数组类型的子项添加动画
@@ -789,10 +800,15 @@ const ConfigItemEditor = ({
       style={{ marginLeft: `${config.depth * 16}px` }}
     >
       <div className={cn(
-        'flex items-start gap-3 px-4 py-3.5 rounded-lg border transition-all duration-200',
+        'flex items-start gap-3 px-4 py-3.5 rounded-lg border transition-all duration-200 relative',
         'hover:border-[#3a3a3a] hover:bg-white/[0.02]',
-        getTypeBgColor(config.type)
+        getTypeBgColor(config.type),
+        isModified && 'ring-1 ring-amber-500/30 border-amber-500/30 bg-amber-500/5'
       )}>
+        {/* 未保存指示器 */}
+        {isModified && (
+          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-amber-500" />
+        )}
         {/* 左侧占位（保持对齐） */}
         <div className="w-5 flex-shrink-0 mt-0.5" />
         
@@ -1277,6 +1293,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   const [content, setContent] = useState<string>('');
   const [parsed, setParsed] = useState<unknown>(null);
   const [originalContent, setOriginalContent] = useState<string>('');
+  const [originalParsed, setOriginalParsed] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1309,6 +1326,65 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     }
     return true;
   }, []);
+  
+  // 获取指定路径的值
+  const getValueByPath = useCallback((obj: unknown, path: string): unknown => {
+    if (!obj || typeof obj !== 'object') return undefined;
+    
+    const keys: string[] = [];
+    let current = '';
+    let inBracket = false;
+    
+    for (let i = 0; i < path.length; i++) {
+      const char = path[i];
+      
+      if (char === '[') {
+        if (current) {
+          keys.push(current);
+          current = '';
+        }
+        inBracket = true;
+      } else if (char === ']') {
+        if (current) {
+          keys.push(current);
+          current = '';
+        }
+        inBracket = false;
+      } else if (char === '.' && !inBracket) {
+        if (current) {
+          keys.push(current);
+          current = '';
+        }
+      } else {
+        current += char;
+      }
+    }
+    
+    if (current) {
+      keys.push(current);
+    }
+    
+    let result: unknown = obj;
+    for (const key of keys) {
+      if (result === null || result === undefined) return undefined;
+      if (Array.isArray(result)) {
+        result = result[parseInt(key, 10)];
+      } else if (typeof result === 'object') {
+        result = (result as Record<string, unknown>)[key];
+      } else {
+        return undefined;
+      }
+    }
+    return result;
+  }, []);
+  
+  // 检查指定路径的值是否已修改
+  const isPathModified = useCallback((path: string): boolean => {
+    if (!originalParsed || !parsed) return false;
+    const originalValue = getValueByPath(originalParsed, path);
+    const currentValue = getValueByPath(parsed, path);
+    return !isDeepEqual(originalValue, currentValue);
+  }, [originalParsed, parsed, getValueByPath, isDeepEqual]);
   
   // 根据 parsed 生成代码内容（用于预览）
   const previewContent = useMemo(() => {
@@ -1405,6 +1481,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
       if (data.success) {
         setContent(data.content);
         setOriginalContent(data.content);
+        setOriginalParsed(data.parsed);
         setParsed(data.parsed);
         
               // 默认收起所有节点（expandedPaths 保持为空）
@@ -1656,6 +1733,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         setTimeout(() => {
           setSaving(false);
           setSaveSuccess(true);
+          // 成功态开始时立即更新原始值，使高亮消失
+          setOriginalParsed(parsed);
           // 延长成功状态显示时间，让用户有足够时间感知
           setTimeout(() => setSaveSuccess(false), 2500);
         }, 300);
@@ -1678,15 +1757,18 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     setContent(originalContent);
     // 根据文件类型解析原始内容
     try {
+      let resetParsed: unknown;
       if (fileType === 'toml') {
         const { default: TOML } = await import('@iarna/toml');
-        setParsed(TOML.parse(originalContent));
+        resetParsed = TOML.parse(originalContent);
       } else if (fileType === 'json5') {
         const JSON5 = await import('json5');
-        setParsed(JSON5.parse(originalContent));
+        resetParsed = JSON5.parse(originalContent);
       } else {
-        setParsed(JSON.parse(originalContent));
+        resetParsed = JSON.parse(originalContent);
       }
+      setParsed(resetParsed);
+      setOriginalParsed(resetParsed);
     } catch (e) {
       // 如果解析失败，保持当前 parsed 值
       console.error('Failed to parse original content:', e);
@@ -2345,6 +2427,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
                             expandedPaths={expandedPaths}
                             toggleExpanded={toggleExpanded}
                             allConfigValues={configValues}
+                            isModified={isPathModified(config.path)}
+                            checkModified={isPathModified}
                           />
                         </motion.div>
                       );

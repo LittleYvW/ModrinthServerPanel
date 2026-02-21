@@ -473,6 +473,69 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// 解析带引号的字符串（用于 TOML section 解析）
+function parseQuotedString(str: string): string | null {
+  str = str.trim();
+  if ((str.startsWith('"') && str.endsWith('"')) || 
+      (str.startsWith("'") && str.endsWith("'"))) {
+    return str.slice(1, -1);
+  }
+  return null;
+}
+
+// 解析 TOML section name，支持带引号的键（如 ["YUNG's Better Dungeons".General]）
+function parseTomlSectionName(sectionContent: string): string[] {
+  const pathParts: string[] = [];
+  let current = '';
+  let inString = false;
+  let stringChar = '';
+  
+  for (let i = 0; i < sectionContent.length; i++) {
+    const char = sectionContent[i];
+    
+    if (!inString) {
+      if (char === '"' || char === "'") {
+        inString = true;
+        stringChar = char;
+        if (current.trim()) {
+          pathParts.push(current.trim());
+          current = '';
+        }
+        current = char;
+      } else if (char === '.') {
+        if (current.trim()) {
+          pathParts.push(current.trim());
+          current = '';
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      current += char;
+      if (char === stringChar && sectionContent[i - 1] !== '\\') {
+        inString = false;
+        const quoted = current.trim();
+        const unquoted = parseQuotedString(quoted);
+        if (unquoted !== null) {
+          pathParts.push(unquoted);
+        } else {
+          pathParts.push(quoted);
+        }
+        current = '';
+      }
+    }
+  }
+  
+  // 处理剩余部分
+  if (current.trim()) {
+    const remaining = current.trim();
+    const unquoted = parseQuotedString(remaining);
+    pathParts.push(unquoted !== null ? unquoted : remaining);
+  }
+  
+  return pathParts;
+}
+
 // 在 TOML 中替换值
 function replaceTomlValue(
   content: string,
@@ -500,8 +563,9 @@ function replaceTomlValue(
     // 检查 section
     const sectionMatch = trimmed.match(/^\[\[?\s*([^\]]+)\s*\]\]?$/);
     if (sectionMatch) {
-      const sectionName = sectionMatch[1].trim();
-      currentSection = sectionName.split('.').map(s => s.trim());
+      const sectionContent = sectionMatch[1].trim();
+      // 使用新的解析函数处理带引号的 section name
+      currentSection = parseTomlSectionName(sectionContent);
       
       // 检查是否进入目标 section
       inTargetSection = targetSectionPath.length > 0 &&

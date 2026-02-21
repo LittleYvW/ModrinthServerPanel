@@ -1812,7 +1812,10 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         // 检查 section 头
         const sectionMatch = trimmed.match(/^\[\[?\s*([^\]]+)\s*\]\]?$/);
         if (sectionMatch) {
-          currentSection = sectionMatch[1].split('.').map(s => s.trim());
+          // 使用 parseKeyLine 中的逻辑解析带引号的 section name
+          const sectionContent = sectionMatch[1].trim();
+          const parsedSection = parseKeyLine(`[${sectionContent}]`);
+          currentSection = parsedSection?.fullPath || [];
           continue;
         }
         

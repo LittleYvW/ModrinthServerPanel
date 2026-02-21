@@ -9,9 +9,9 @@ import path from 'path';
 function extractModKeywords(modName: string, filename: string): string[] {
   const keywords: string[] = [];
   
-  // 从模组名称提取关键词（按空格、下划线、连字符分割）
-  const nameParts = modName.toLowerCase().split(/[\s_\-]+/);
-  keywords.push(...nameParts.filter(p => p.length > 2));
+  // 从模组名称提取完整关键词（去掉空格后的完整名称）
+  // 例如 "Better Days" -> "betterdays"
+  keywords.push(modName.toLowerCase().replace(/\s+/g, ''));
   
   // 从文件名提取（去掉版本号等）
   const fileBase = path.basename(filename, path.extname(filename));
@@ -24,11 +24,10 @@ function extractModKeywords(modName: string, filename: string): string[] {
     .replace(/-neoforge/g, '')
     .replace(/-quilt/g, '');
   
-  const fileParts = cleanFileName.split(/[\s_\-]+/);
-  keywords.push(...fileParts.filter(p => p.length > 2));
+  // 只添加去掉空格后的完整文件名（不按空格分割）
+  keywords.push(cleanFileName.replace(/\s+/g, ''));
   
   // 添加 slug 风格的名称
-  keywords.push(modName.toLowerCase().replace(/\s+/g, ''));
   keywords.push(modName.toLowerCase().replace(/\s+/g, '-'));
   keywords.push(modName.toLowerCase().replace(/\s+/g, '_'));
   

@@ -1687,23 +1687,7 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
           return;
         }
         
-        // 调用 API 进行智能替换预览
-        const res = await fetch('/api/mod-configs/file', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            path: filePath,
-            content: originalContent,
-            format: fileType,
-            useSmartReplace: true,
-            changes: changes,
-            previewOnly: true,
-          }),
-        });
-        
-        await res.json();
-        
-        // 使用本地智能替换逻辑来生成预览
+        // 使用本地智能替换逻辑生成预览（避免不必要的 API 调用）
         const preview = generateSmartPreviewLocal(originalContent, changes, fileType);
         setSmartPreviewContent(preview);
       } catch {
@@ -1750,32 +1734,121 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     const keys = keyPath.split(/\.|\[(\d+)\]/).filter(Boolean);
     if (keys.length === 0) return content;
     
-    const lines = content.split('\n');
     const targetKey = keys[keys.length - 1];
+    const parentPath = keys.slice(0, -1);
     
-    // 简单的替换逻辑：查找目标键并替换值
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+    const lines = content.split('\n');
+    
+    if (fileType === 'toml') {
+      // TOML: 需要处理 section
+      let currentSection: string[] = [];
       
-      // 检查是否包含目标键
-      const keyPattern = new RegExp(`(["']?)${escapeRegex(targetKey)}\\1\\s*[:=]`);
-      if (keyPattern.test(line)) {
-        // 查找值的位置
-        const valueMatch = line.match(/[:=]\s*/);
-        if (!valueMatch) continue;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
         
-        const valueStart = line.indexOf(valueMatch[0]) + valueMatch[0].length;
+        // 检查 section 头
+        const sectionMatch = trimmed.match(/^\[\[?\s*([^\]]+)\s*\]\]?$/);
+        if (sectionMatch) {
+          currentSection = sectionMatch[1].split('.').map(s => s.trim());
+          continue;
+        }
+        
+        // 判断是否在目标 section 中
+        // 无 section 键：只在无 section 区域查找（currentSection.length === 0）
+        // 有 section 键：在匹配的 section 中查找
+        const inTargetSection = parentPath.length === 0
+          ? currentSection.length === 0
+          : parentPath.length === currentSection.length &&
+            parentPath.every((k, idx) => currentSection[idx] === k);
+        
+        if (inTargetSection) {
+          const result = tryReplaceValueInLine(line, targetKey, value, '=');
+          if (result.replaced) {
+            lines[i] = result.newLine;
+            return lines.join('\n');
+          }
+        }
+      }
+    } else {
+      // JSON/JSON5: 简单键值替换（需要处理嵌套结构）
+      // 对于嵌套路径，需要跟踪当前层级
+      const searchInJson = (lines: string[], keys: string[], startLine: number, depth: number): { replaced: boolean; lineIndex: number } => {
+        const target = keys[depth];
+        let braceDepth = 0;
+        let inString = false;
+        let stringChar = '';
+        
+        for (let i = startLine; i < lines.length; i++) {
+          const line = lines[i];
+          
+          // 跟踪字符串和括号深度
+          for (const char of line) {
+            if (!inString && (char === '"' || char === "'")) {
+              inString = true;
+              stringChar = char;
+            } else if (inString && char === stringChar) {
+              inString = false;
+            } else if (!inString) {
+              if (char === '{' || char === '[') braceDepth++;
+              else if (char === '}' || char === ']') braceDepth--;
+            }
+          }
+          
+          // 只在正确的层级查找键
+          if (braceDepth === depth) {
+            const result = tryReplaceValueInLine(line, target, value, ':');
+            if (result.replaced) {
+              lines[i] = result.newLine;
+              return { replaced: true, lineIndex: i };
+            }
+          }
+          
+          // 如果括号深度小于目标深度，说明已经离开目标区域
+          if (braceDepth < depth) {
+            return { replaced: false, lineIndex: -1 };
+          }
+        }
+        
+        return { replaced: false, lineIndex: -1 };
+      };
+      
+      // 从最顶层开始搜索
+      searchInJson(lines, keys, 0, 0);
+    }
+    
+    return lines.join('\n');
+  };
+  
+  // 尝试在单行中替换值
+  const tryReplaceValueInLine = (
+    line: string,
+    key: string,
+    value: unknown,
+    separator: ':' | '='
+  ): { replaced: boolean; newLine: string } => {
+    // 匹配键值对模式："key" = value, 'key' = value, key = value
+    const patterns = [
+      new RegExp(`^([\\s]*)"${escapeRegex(key)}"([\\s]*${escapeRegex(separator)}[\\s]*)`),
+      new RegExp(`^([\\s]*)'${escapeRegex(key)}'([\\s]*${escapeRegex(separator)}[\\s]*)`),
+      new RegExp(`^([\\s]*)${escapeRegex(key)}([\\s]*${escapeRegex(separator)}[\\s]*)`)
+    ];
+    
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      if (match) {
+        const valueStart = match[0].length;
         const originalValueEnd = findValueEndInLine(line, valueStart);
         
         if (originalValueEnd > valueStart) {
-          const formattedValue = formatValueForPreview(value, fileType === 'json5');
-          lines[i] = line.slice(0, valueStart) + formattedValue + line.slice(originalValueEnd);
-          break;
+          const formattedValue = formatValueForPreview(value, separator === ':');
+          const newLine = line.slice(0, valueStart) + formattedValue + line.slice(originalValueEnd);
+          return { replaced: true, newLine };
         }
       }
     }
     
-    return lines.join('\n');
+    return { replaced: false, newLine: line };
   };
   
   // 查找行内值的结束位置
@@ -2170,80 +2243,84 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     return changes;
   }, [originalParsed, parsed]);
 
-  // 保存文件
+  // 保存文件 - 优化版本
   const handleSave = async () => {
+    if (!parsed || !originalContent) return;
+    
     setSaving(true);
     setError(null);
+    setSaveSuccess(false);
     
     try {
       // 收集所有变更
       const changes = collectChanges();
       
-      // 使用 finalPreviewContent 作为要保存的内容（反映当前编辑状态）
-      // 如果 finalPreviewContent 为空（如 TOML 还在异步生成中），则实时生成
-      let finalContent = finalPreviewContent;
-      
-      if (!finalContent && parsed) {
-        // 备用生成逻辑
-        if (fileType === 'json' || fileType === 'json5') {
-          finalContent = JSON.stringify(parsed, null, 2);
-        } else if (fileType === 'toml') {
-          const { default: TOML } = await import('@iarna/toml');
-          finalContent = TOML.stringify(parsed as unknown as Parameters<typeof TOML.stringify>[0]);
-        }
+      // 检查是否有实际变更
+      if (changes.length === 0) {
+        // 没有变更，直接显示成功状态
+        setSaving(false);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 1500);
+        return;
       }
       
-      // 如果没有生成内容或解析失败，使用原始内容
-      if (!finalContent) {
-        finalContent = content;
-      }
-      
+      // 调用 API 保存
+      // 传递 originalContent 和 changes，让后端进行智能替换
       const res = await fetch('/api/mod-configs/file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           path: filePath,
-          content: finalContent,
           format: fileType,
           useSmartReplace: true,
           changes: changes,
+          originalContent: originalContent, // 传递原始内容供智能替换使用
         }),
       });
       
-      const data = await res.json();
+      const data = await res.json() as { success?: boolean; error?: string; content?: string };
       
-      if (data.success) {
-        // 先保持 saving 状态短暂时间，让加载动画完整显示
-        // 然后切换到成功态，确保动画序列正确
-        setTimeout(() => {
-          setSaving(false);
-          setSaveSuccess(true);
-          // 成功态开始时立即更新原始值，使高亮消失
-          setOriginalParsed(parsed);
-          // 延长成功状态显示时间，让用户有足够时间感知
-          setTimeout(() => setSaveSuccess(false), 2500);
-        }, 300);
-        // 更新内容状态 - 重新读取文件以获取实际保存的内容（包含注释）
-        const refreshRes = await fetch(`/api/mod-configs/file?path=${encodeURIComponent(filePath)}`);
-        const refreshData = await refreshRes.json();
-        if (refreshData.success) {
-          setContent(refreshData.content);
-          setOriginalContent(refreshData.content);
-        }
-        setHasChanges(false);
-        onSave?.();
-      } else {
-        setError(data.error || 'Failed to save file');
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? `Save failed with status ${res.status}`);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      
+      // 保存成功，更新状态
+      // 使用后端返回的内容（包含正确的格式和注释）
+      const savedContent = data.content || originalContent;
+      
+      // 先更新原始值，使修改高亮消失
+      setOriginalParsed(parsed);
+      setOriginalContent(savedContent);
+      setContent(savedContent);
+      setHasChanges(false);
+      
+      // 显示成功状态
       setSaving(false);
+      setSaveSuccess(true);
+      
+      // 触发保存回调
+      onSave?.();
+      
+      // 延迟关闭成功状态
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 2500);
+      
+    } catch (err) {
+      console.error('Save error:', err);
+      setError(err instanceof Error ? err.message : '保存失败，请重试');
+      setSaving(false);
+      setSaveSuccess(false);
     }
   };
   
-  // 重置更改
-  const handleReset = async () => {
-    setContent(originalContent);
+  // 重置更改 - 恢复到上次保存的状态
+  const handleReset = useCallback(async () => {
+    if (!originalContent) return;
+    
+    // 清除错误状态
+    setError(null);
+    
     // 根据文件类型解析原始内容
     try {
       let resetParsed: unknown;
@@ -2256,14 +2333,17 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
       } else {
         resetParsed = JSON.parse(originalContent);
       }
+      
       setParsed(resetParsed);
       setOriginalParsed(resetParsed);
+      setContent(originalContent);
+      setHasChanges(false);
+      setSaveSuccess(false);
     } catch (e) {
-      // 如果解析失败，保持当前 parsed 值
       console.error('Failed to parse original content:', e);
+      setError('重置失败：无法解析原始配置内容');
     }
-    setHasChanges(false);
-  };
+  }, [originalContent, fileType]);
   
   // 展开/折叠全部
   const expandAll = useCallback(() => {

@@ -348,7 +348,7 @@ function findValueEnd(line: string, start: number): number {
   return j + 1;
 }
 
-// 替换嵌套的 JSON 值
+// 替换嵌套的 JSON 值（基于缩进和括号深度）
 function replaceNestedJsonValue(
   content: string,
   keys: Array<{ key: string; isArrayIndex: boolean }>,
@@ -356,56 +356,112 @@ function replaceNestedJsonValue(
   isJson5: boolean
 ): string {
   const lines = content.split('\n');
+  const targetKey = keys[keys.length - 1];
+  const parentKeys = keys.slice(0, -1);
   
-  // 尝试找到包含目标键的行
+  // 跟踪当前路径
+  const pathStack: string[] = [];
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let inString = false;
+  let stringChar = '';
+  
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const trimmed = line.trim();
     
-    // 检查是否是目标键定义行（考虑嵌套路径）
-    const keyMatch = matchNestedKey(line, keys);
-    if (keyMatch) {
-      const { valueStart, valueEnd } = keyMatch;
-      const formattedValue = formatValue(value, isJson5);
-      lines[i] = line.slice(0, valueStart) + formattedValue + line.slice(valueEnd);
-      return lines.join('\n');
+    // 跳过空行和注释行
+    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+      continue;
+    }
+    
+    // 解析当前行，更新路径和深度
+    let lineKey: string | null = null;
+    let foundKeyAtDepth = -1;
+    
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      const prevChar = j > 0 ? line[j - 1] : '';
+      
+      // 处理字符串
+      if (!inString && (char === '"' || char === "'")) {
+        inString = true;
+        stringChar = char;
+        continue;
+      }
+      if (inString) {
+        if (char === stringChar && prevChar !== '\\') {
+          inString = false;
+        }
+        continue;
+      }
+      
+      // 处理括号和方括号
+      if (char === '{' ) {
+        braceDepth++;
+      } else if (char === '}') {
+        if (braceDepth === foundKeyAtDepth + 1) {
+          // 离开当前键的对象
+          pathStack.pop();
+        }
+        braceDepth--;
+      } else if (char === '[') {
+        bracketDepth++;
+      } else if (char === ']') {
+        bracketDepth--;
+      }
+      
+      // 检测键（只在对象内部且不在数组内）
+      if (braceDepth > 0 && bracketDepth === 0 && (char === ':' || char === '=')) {
+        // 向前查找键名
+        const beforeColon = line.slice(0, j).trimEnd();
+        const keyMatch = beforeColon.match(/["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?$/);
+        if (keyMatch) {
+          lineKey = keyMatch[1];
+          foundKeyAtDepth = braceDepth - 1;
+          
+          // 更新路径栈
+          while (pathStack.length > foundKeyAtDepth) {
+            pathStack.pop();
+          }
+          pathStack[foundKeyAtDepth] = lineKey;
+        }
+      }
+    }
+    
+    // 检查是否匹配目标路径
+    const currentPath = pathStack.join('.');
+    const targetParentPath = parentKeys.map(k => k.key).join('.');
+    
+    if (lineKey === targetKey.key && currentPath === (targetParentPath ? `${targetParentPath}.${targetKey.key}` : targetKey.key)) {
+      // 找到目标键，进行替换
+      const keyMatch = matchJsonKey(line, targetKey.key);
+      if (keyMatch) {
+        const { valueStart, valueEnd } = keyMatch;
+        const formattedValue = formatValue(value, isJson5);
+        lines[i] = line.slice(0, valueStart) + formattedValue + line.slice(valueEnd);
+        return lines.join('\n');
+      }
     }
   }
   
   return content;
 }
 
-// 匹配嵌套键
-function matchNestedKey(
-  line: string,
-  keys: Array<{ key: string; isArrayIndex: boolean }>
-): { valueStart: number; valueEnd: number } | null {
-  const targetKey = keys[keys.length - 1];
+// 匹配 JSON 键
+function matchJsonKey(line: string, key: string): { valueStart: number; valueEnd: number } | null {
+  const patterns = [
+    new RegExp(`^([\\s]*)"${escapeRegex(key)}"([\\s]*:[\\s]*)`),
+    new RegExp(`^([\\s]*)'${escapeRegex(key)}'([\\s]*:[\\s]*)`),
+    new RegExp(`^([\\s]*)${escapeRegex(key)}([\\s]*:[\\s]*)`)
+  ];
   
-  if (targetKey.isArrayIndex) {
-    // 数组索引匹配
-    const pattern = new RegExp(`\\[\\s*${escapeRegex(targetKey.key)}\\s*\\](\\s*)`);
+  for (const pattern of patterns) {
     const match = line.match(pattern);
-    if (match && match.index !== undefined) {
-      const valueStart = match.index + match[0].length;
+    if (match) {
+      const valueStart = match[0].length;
       const valueEnd = findValueEnd(line, valueStart);
       return { valueStart, valueEnd };
-    }
-  } else {
-    // 对象键匹配
-    const patterns = [
-      `"${escapeRegex(targetKey.key)}"\\s*:(\\s*)`,
-      `'${escapeRegex(targetKey.key)}'\\s*:(\\s*)`,
-      `\\b${escapeRegex(targetKey.key)}\\s*:(\\s*)`
-    ];
-    
-    for (const p of patterns) {
-      const regex = new RegExp(p);
-      const match = line.match(regex);
-      if (match && match.index !== undefined) {
-        const valueStart = match.index + match[0].length;
-        const valueEnd = findValueEnd(line, valueStart);
-        return { valueStart, valueEnd };
-      }
     }
   }
   
@@ -430,8 +486,11 @@ function replaceTomlValue(
   const targetKey = keys[keys.length - 1];
   const parentKeys = keys.slice(0, -1);
   
+  // 构建目标 section 路径（只使用非数组索引的键）
+  const targetSectionPath = parentKeys.filter(k => !k.isArrayIndex).map(k => k.key);
+  
   // 判断是否在 section 中
-  let inTargetSection = parentKeys.length === 0;
+  let inTargetSection = targetSectionPath.length === 0;
   let currentSection: string[] = [];
   
   for (let i = 0; i < lines.length; i++) {
@@ -445,14 +504,20 @@ function replaceTomlValue(
       currentSection = sectionName.split('.').map(s => s.trim());
       
       // 检查是否进入目标 section
-      if (parentKeys.length > 0) {
-        inTargetSection = matchesSection(parentKeys, currentSection);
-      }
+      inTargetSection = targetSectionPath.length > 0 &&
+        targetSectionPath.length === currentSection.length &&
+        targetSectionPath.every((k, idx) => k === currentSection[idx]);
       continue;
     }
     
     // 在目标 section 中查找键
-    if (inTargetSection || parentKeys.length === 0) {
+    // 对于无 section 的键（targetSectionPath.length === 0），只在没有 section 的区域查找
+    // 对于带 section 的键，必须在正确的 section 中
+    const shouldSearch = targetSectionPath.length === 0 
+      ? currentSection.length === 0 // 无 section 键：只在无 section 区域查找
+      : inTargetSection;            // 有 section 键：在目标 section 中查找
+    
+    if (shouldSearch) {
       const keyMatch = matchTomlKey(line, targetKey.key);
       if (keyMatch) {
         const { valueStart, valueEnd } = keyMatch;
@@ -467,32 +532,23 @@ function replaceTomlValue(
 }
 
 // 匹配 section
-function matchesSection(
-  parentKeys: Array<{ key: string; isArrayIndex: boolean }>,
-  sectionParts: string[]
-): boolean {
-  if (parentKeys.length !== sectionParts.length) return false;
-  
-  for (let i = 0; i < parentKeys.length; i++) {
-    if (parentKeys[i].key !== sectionParts[i]) return false;
-  }
-  
-  return true;
-}
-
 // 匹配 TOML 键
 function matchTomlKey(line: string, key: string): { valueStart: number; valueEnd: number } | null {
   // TOML 键模式: key = , "key" = , 'key' =
+  // 使用捕获组捕获等号后的空白，以便正确定位值开始位置
   const patterns = [
-    `^\\s*(?:["']?)${escapeRegex(key)}(?:["']?)\\s*=\\s*()`,
-    `^\\s*${escapeRegex(key)}\\s*=\\s*()`
+    `^\\s*(?:["']?)${escapeRegex(key)}(?:["']?)\\s*=(\\s*)`,
+    `^\\s*${escapeRegex(key)}\\s*=(\\s*)`
   ];
   
   for (const p of patterns) {
     const regex = new RegExp(p);
     const match = line.match(regex);
     if (match && match.index !== undefined) {
-      const valueStart = match.index + match[0].length - 2; // -2 for the empty capture group ()
+      // match[0] 包含键、等号和等号后的空白
+      // match[1] 是等号后的空白
+      // 值开始位置应该是 match[0] 的末尾（在等号后的空白之后）
+      const valueStart = match.index + match[0].length;
       const valueEnd = findTomlValueEnd(line, valueStart);
       return { valueStart, valueEnd };
     }
@@ -606,15 +662,73 @@ function formatTomlValue(value: unknown): string {
   return String(value);
 }
 
+// 创建备份文件
+function createBackup(filePath: string): string | null {
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupDir = path.join(path.dirname(filePath), '.backups');
+    const backupName = `${path.basename(filePath)}.${timestamp}.bak`;
+    const backupPath = path.join(backupDir, backupName);
+    
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+    
+    fs.copyFileSync(filePath, backupPath);
+    
+    // 清理旧备份（保留最近 10 个）
+    try {
+      const backups = fs.readdirSync(backupDir)
+        .filter(f => f.startsWith(path.basename(filePath)) && f.endsWith('.bak'))
+        .map(f => ({
+          name: f,
+          path: path.join(backupDir, f),
+          time: fs.statSync(path.join(backupDir, f)).mtime.getTime()
+        }))
+        .sort((a, b) => b.time - a.time);
+      
+      if (backups.length > 10) {
+        backups.slice(10).forEach(b => {
+          try { fs.unlinkSync(b.path); } catch { /* ignore */ }
+        });
+      }
+    } catch { /* ignore cleanup errors */ }
+    
+    return backupPath;
+  } catch (err) {
+    console.warn('Failed to create backup:', err);
+    return null;
+  }
+}
+
+// 验证配置内容
+function validateConfig(content: string, fileType: string): { valid: boolean; error?: string } {
+  try {
+    if (fileType === 'json' || fileType === 'json5') {
+      JSON5.parse(content);
+    } else if (fileType === 'toml') {
+      TOML.parse(content);
+    }
+    return { valid: true };
+  } catch (e) {
+    return { 
+      valid: false, 
+      error: e instanceof Error ? e.message : 'Parse error' 
+    };
+  }
+}
+
 // 保存配置文件
 export async function POST(request: NextRequest) {
+  let tempFile: string | null = null;
+  
   try {
     const body = await request.json();
-    const { path: filePath, content, format, changes, useSmartReplace } = body;
+    const { path: filePath, content, format, changes, useSmartReplace, originalContent: providedOriginal } = body;
     
-    if (!filePath || content === undefined) {
+    if (!filePath) {
       return NextResponse.json(
-        { error: 'Missing file path or content' },
+        { error: 'Missing file path' },
         { status: 400 }
       );
     }
@@ -647,47 +761,86 @@ export async function POST(request: NextRequest) {
       fs.mkdirSync(dir, { recursive: true });
     }
     
-    // 根据格式处理内容
-    let finalContent = content;
     const ext = path.extname(filePath).toLowerCase();
     const fileType = format || ext.replace('.', '');
     
-    // 如果启用智能替换且有变更列表，使用智能替换
-    if (useSmartReplace && changes && Array.isArray(changes) && changes.length > 0 && fs.existsSync(fullPath)) {
-      try {
-        const originalContent = fs.readFileSync(fullPath, 'utf-8');
-        const actualFileType = (fileType === 'json5' || fileType === 'json') ? 'json' : 'toml';
-        finalContent = smartReplaceValue(originalContent, changes, actualFileType as 'json' | 'toml');
-      } catch (err) {
-        console.warn('Smart replace failed, falling back to overwrite:', err);
-        // 智能替换失败时回退到覆盖模式
-        finalContent = content;
-      }
-    } else if (fileType === 'json' || fileType === 'json5') {
-      // 尝试解析并格式化 JSON/JSON5
-      try {
-        const parsed = JSON5.parse(content);
-        if (fileType === 'json5') {
-          // JSON5 保持原样写入（保留注释）- 但现在应该已经通过智能替换处理了
-          finalContent = content;
-        } else {
-          // JSON 格式化输出
-          finalContent = JSON.stringify(parsed, null, 2);
-        }
-      } catch {
-        // 解析失败，按原样保存
-        finalContent = content;
-      }
+    // 确定基础内容
+    let baseContent: string;
+    let isNewFile = false;
+    
+    if (fs.existsSync(fullPath)) {
+      // 文件已存在，读取原内容或使用提供的原内容
+      baseContent = providedOriginal ?? fs.readFileSync(fullPath, 'utf-8');
+    } else {
+      // 新文件
+      isNewFile = true;
+      baseContent = content ?? '';
     }
     
-    // 写入文件
-    fs.writeFileSync(fullPath, finalContent, 'utf-8');
+    // 确定最终内容
+    let finalContent: string;
+    
+    if (useSmartReplace && changes && Array.isArray(changes) && changes.length > 0 && !isNewFile) {
+      // 智能替换模式：基于原内容应用变更
+      try {
+        const actualFileType = (fileType === 'json5' || fileType === 'json') ? 'json' : 'toml';
+        finalContent = smartReplaceValue(baseContent, changes, actualFileType as 'json' | 'toml');
+      } catch (err) {
+        console.warn('Smart replace failed:', err);
+        // 智能替换失败，如果有提供 content 则使用，否则报错
+        if (content === undefined) {
+          return NextResponse.json(
+            { error: 'Smart replace failed and no fallback content provided' },
+            { status: 500 }
+          );
+        }
+        finalContent = content;
+      }
+    } else if (content !== undefined) {
+      // 直接覆盖模式
+      finalContent = content;
+    } else {
+      return NextResponse.json(
+        { error: 'No content provided for new file' },
+        { status: 400 }
+      );
+    }
+    
+    // 验证内容格式
+    const validation = validateConfig(finalContent, fileType);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: `Invalid ${fileType.toUpperCase()} format: ${validation.error}` },
+        { status: 400 }
+      );
+    }
+    
+    // 为现有文件创建备份
+    let backupPath: string | null = null;
+    if (!isNewFile && fs.existsSync(fullPath)) {
+      backupPath = createBackup(fullPath);
+    }
+    
+    // 事务性保存：先写入临时文件，再重命名
+    tempFile = `${fullPath}.tmp.${Date.now()}`;
+    fs.writeFileSync(tempFile, finalContent, 'utf-8');
+    
+    // 原子性替换
+    fs.renameSync(tempFile, fullPath);
+    tempFile = null; // 标记为已处理
     
     return NextResponse.json({
       success: true,
       message: 'File saved successfully',
+      backup: backupPath,
+      content: finalContent, // 返回保存的内容，避免前端重新请求
     });
   } catch (error) {
+    // 清理临时文件
+    if (tempFile && fs.existsSync(tempFile)) {
+      try { fs.unlinkSync(tempFile); } catch { /* ignore */ }
+    }
+    
     console.error('Save config file error:', error);
     return NextResponse.json(
       { error: 'Failed to save config file' },

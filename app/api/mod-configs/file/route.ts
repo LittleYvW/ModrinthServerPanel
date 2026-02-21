@@ -535,19 +535,29 @@ function replaceTomlValue(
 // 匹配 TOML 键
 function matchTomlKey(line: string, key: string): { valueStart: number; valueEnd: number } | null {
   // TOML 键模式: key = , "key" = , 'key' =
-  // 使用捕获组捕获等号后的空白，以便正确定位值开始位置
-  const patterns = [
-    `^\\s*(?:["']?)${escapeRegex(key)}(?:["']?)\\s*=(\\s*)`,
-    `^\\s*${escapeRegex(key)}\\s*=(\\s*)`
+  // 需要处理带特殊字符的键名（如空格、&等）
+  
+  // 首先尝试匹配带引号的键（处理包含特殊字符的键名）
+  const quotedPatterns = [
+    `^\\s*"${escapeRegex(key)}"\\s*=(\\s*)`,  // "key" =
+    `^\\s*'${escapeRegex(key)}'\\s*=(\\s*)`   // 'key' =
   ];
   
-  for (const p of patterns) {
+  for (const p of quotedPatterns) {
     const regex = new RegExp(p);
     const match = line.match(regex);
     if (match && match.index !== undefined) {
-      // match[0] 包含键、等号和等号后的空白
-      // match[1] 是等号后的空白
-      // 值开始位置应该是 match[0] 的末尾（在等号后的空白之后）
+      const valueStart = match.index + match[0].length;
+      const valueEnd = findTomlValueEnd(line, valueStart);
+      return { valueStart, valueEnd };
+    }
+  }
+  
+  // 然后尝试匹配裸键（仅包含字母数字下划线和连字符）
+  if (/^[a-zA-Z0-9_-]+$/.test(key)) {
+    const barePattern = new RegExp(`^\\s*${escapeRegex(key)}\\s*=(\\s*)`);
+    const match = line.match(barePattern);
+    if (match && match.index !== undefined) {
       const valueStart = match.index + match[0].length;
       const valueEnd = findTomlValueEnd(line, valueStart);
       return { valueStart, valueEnd };

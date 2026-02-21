@@ -117,8 +117,19 @@ const getTypeBgColor = (type: ConfigValue['type']) => {
   }
 };
 
+// 解析带引号的 TOML 键（支持 "key" 或 'key'）
+function parseQuotedKey(str: string): string | null {
+  str = str.trim();
+  if ((str.startsWith('"') && str.endsWith('"')) || 
+      (str.startsWith("'") && str.endsWith("'"))) {
+    return str.slice(1, -1);
+  }
+  return null;
+}
+
 // 检测行是否为键定义行，返回键名、完整路径和缩进层级
 // 支持嵌套 section 如 [M.m] -> key='m', fullPath=['M', 'm']
+// 支持带引号的 section 如 ["YUNG's Better Dungeons".General]
 function parseKeyLine(line: string): { 
   key: string; 
   fullPath: string[];
@@ -129,13 +140,62 @@ function parseKeyLine(line: string): {
   const indent = line.length - line.trimStart().length;
   const trimmed = line.trim();
   
-  // TOML section: [key] 或 [[key]] 或 [a.b.c]
+  // TOML section: [key] 或 [[key]] 或 [a.b.c] 或 ["quoted.key"]
   const sectionMatch = trimmed.match(/^\[\[?\s*([^\]]+)\s*\]\]?$/);
   if (sectionMatch) {
-    const sectionName = sectionMatch[1].trim();
-    // 处理嵌套 section 如 "M.m" -> ['M', 'm']
-    const pathParts = sectionName.split('.').map(p => p.trim());
-    const key = pathParts[pathParts.length - 1];
+    const sectionContent = sectionMatch[1].trim();
+    
+    // 解析 section 中的各个部分（支持带引号的键）
+    const pathParts: string[] = [];
+    let current = '';
+    let inString = false;
+    let stringChar = '';
+    
+    for (let i = 0; i < sectionContent.length; i++) {
+      const char = sectionContent[i];
+      
+      if (!inString) {
+        if (char === '"' || char === "'") {
+          inString = true;
+          stringChar = char;
+          if (current.trim()) {
+            pathParts.push(current.trim());
+            current = '';
+          }
+          current = char;
+        } else if (char === '.') {
+          if (current.trim()) {
+            pathParts.push(current.trim());
+            current = '';
+          }
+        } else {
+          current += char;
+        }
+      } else {
+        current += char;
+        if (char === stringChar && sectionContent[i - 1] !== '\\') {
+          inString = false;
+          // 完整引号字符串，去除引号后添加
+          const quoted = current.trim();
+          const unquoted = parseQuotedKey(quoted);
+          if (unquoted !== null) {
+            pathParts.push(unquoted);
+          } else {
+            pathParts.push(quoted);
+          }
+          current = '';
+        }
+      }
+    }
+    
+    // 处理剩余部分
+    if (current.trim()) {
+      const remaining = current.trim();
+      const unquoted = parseQuotedKey(remaining);
+      pathParts.push(unquoted !== null ? unquoted : remaining);
+    }
+    
+    const key = pathParts[pathParts.length - 1] || '';
     return { 
       key, 
       fullPath: pathParts,
@@ -1830,11 +1890,18 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     separator: ':' | '='
   ): { replaced: boolean; newLine: string } => {
     // 匹配键值对模式："key" = value, 'key' = value, key = value
+    // 优先匹配带引号的键（处理包含特殊字符的键名，如空格、&等）
     const patterns = [
       new RegExp(`^([\\s]*)"${escapeRegex(key)}"([\\s]*${escapeRegex(separator)}[\\s]*)`),
-      new RegExp(`^([\\s]*)'${escapeRegex(key)}'([\\s]*${escapeRegex(separator)}[\\s]*)`),
-      new RegExp(`^([\\s]*)${escapeRegex(key)}([\\s]*${escapeRegex(separator)}[\\s]*)`)
+      new RegExp(`^([\\s]*)'${escapeRegex(key)}'([\\s]*${escapeRegex(separator)}[\\s]*)`)
     ];
+    
+    // 对于裸键（仅包含字母数字下划线和连字符），也尝试无引号匹配
+    if (/^[a-zA-Z0-9_-]+$/.test(key)) {
+      patterns.push(
+        new RegExp(`^([\\s]*)${escapeRegex(key)}([\\s]*${escapeRegex(separator)}[\\s]*)`)
+      );
+    }
     
     for (const pattern of patterns) {
       const match = line.match(pattern);

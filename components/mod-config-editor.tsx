@@ -192,11 +192,63 @@ function parseCommentLine(line: string): string | null {
   return null;
 }
 
+// 转义正则表达式特殊字符
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// 从行内注释提取描述（如 key = value # 注释）
+function extractInlineComment(line: string, fileType: 'json' | 'json5' | 'toml'): string | null {
+  const trimmed = line.trim();
+  
+  // JSON5/JavaScript 风格行内注释
+  if (fileType === 'json5' || fileType === 'json') {
+    const lineCommentIdx = trimmed.indexOf('//');
+    if (lineCommentIdx > 0) {
+      return trimmed.slice(lineCommentIdx + 2).trim();
+    }
+  }
+  
+  // TOML 风格行内注释
+  if (fileType === 'toml') {
+    const hashIdx = trimmed.indexOf('#');
+    if (hashIdx > 0) {
+      // 确保 # 不在字符串内
+      let inString = false;
+      let stringChar = '';
+      for (let i = 0; i < hashIdx; i++) {
+        const char = trimmed[i];
+        if (!inString && (char === '"' || char === "'")) {
+          inString = true;
+          stringChar = char;
+        } else if (inString && char === stringChar) {
+          // 检查转义
+          let backslashCount = 0;
+          let j = i - 1;
+          while (j >= 0 && trimmed[j] === '\\') {
+            backslashCount++;
+            j--;
+          }
+          if (backslashCount % 2 === 0) {
+            inString = false;
+          }
+        }
+      }
+      if (!inString) {
+        return trimmed.slice(hashIdx + 1).trim();
+      }
+    }
+  }
+  
+  return null;
+}
+
 // 从注释提取描述（支持层级感知，包括嵌套 section）
 function extractDescription(
   content: string, 
   key: string, 
-  parentPath: string = ''
+  parentPath: string = '',
+  fileType: 'json' | 'json5' | 'toml' = 'json'
 ): string | undefined {
   const lines = content.split('\n');
   
@@ -252,7 +304,10 @@ function extractDescription(
         }
         
         if (matches) {
-          // 找到目标键，向前查找注释
+          // 找到目标键，首先尝试提取行内注释
+          const inlineComment = extractInlineComment(line, fileType);
+          
+          // 向前查找独立注释
           const descriptionLines: string[] = [];
           const currentIndent = parsed.indent;
           
@@ -301,8 +356,17 @@ function extractDescription(
             break;
           }
           
+          // 合并独立注释和行内注释
+          const allComments: string[] = [];
           if (descriptionLines.length > 0) {
-            return descriptionLines.join('\n');
+            allComments.push(...descriptionLines);
+          }
+          if (inlineComment) {
+            allComments.push(inlineComment);
+          }
+          
+          if (allComments.length > 0) {
+            return allComments.join('\n');
           }
         }
       }
@@ -321,7 +385,8 @@ function extractConfigValues(
   content: string,
   path: string = '', 
   depth: number = 0,
-  isArrayElement: boolean = false
+  isArrayElement: boolean = false,
+  fileType: 'json' | 'json5' | 'toml' = 'json'
 ): ConfigValue[] {
   const results: ConfigValue[] = [];
   
@@ -367,13 +432,13 @@ function extractConfigValues(
         key,
         value,
         type,
-        description: extractDescription(content, key, parentPath),
+        description: extractDescription(content, key, parentPath, fileType),
         path: currentPath,
         depth: isArrayElement ? depth + 1 : depth,
       });
       
       if (typeof value === 'object' && value !== null) {
-        results.push(...extractConfigValues(value, content, currentPath, isArrayElement ? depth + 1 : depth + 1));
+        results.push(...extractConfigValues(value, content, currentPath, isArrayElement ? depth + 1 : depth + 1, false, fileType));
       }
     }
   } else if (Array.isArray(obj)) {
@@ -395,7 +460,7 @@ function extractConfigValues(
         });
       } else {
         // 对象或嵌套数组，标记为数组元素以便正确处理
-        results.push(...extractConfigValues(item, content, currentPath, depth, true));
+        results.push(...extractConfigValues(item, content, currentPath, depth, true, fileType));
       }
     });
   }
@@ -1181,9 +1246,13 @@ const tokenizeLine = (line: string, fileType: 'json' | 'json5' | 'toml'): Token[
       }
     }
     
-    // 6. 注释 (JSON5: //, /* */; TOML: #)
-    if ((fileType === 'json5' && (peek(0) + peek(1) === '//' || peek(0) + peek(1) === '/*')) ||
-        (fileType === 'toml' && char === '#')) {
+    // 6. 注释 (JSON/JSON5: //, /* */; TOML: #)
+    // 配置文件中的 JSON 通常包含注释，所以也高亮 JSON 中的注释
+    const isCommentStart = (fileType === 'json5' || fileType === 'json') && 
+                           (peek(0) + peek(1) === '//' || peek(0) + peek(1) === '/*');
+    const isTomlComment = fileType === 'toml' && char === '#';
+    
+    if (isCommentStart || isTomlComment) {
       let value = '';
       if (peek(0) + peek(1) === '/*') {
         // 块注释
@@ -1542,50 +1611,241 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
     return !isDeepEqual(originalValue, currentValue);
   }, [originalParsed, parsed, getValueByPath, isDeepEqual]);
   
-  // 根据 parsed 生成代码内容（用于预览）
-  const previewContent = useMemo(() => {
-    if (!parsed) return '';
-    
-    if (fileType === 'toml') {
-      // TOML 需要异步导入，这里先用 JSON.stringify 作为占位
-      // 实际使用时在 useEffect 中更新
-      return '';
-    } else if (fileType === 'json5') {
-      return JSON.stringify(parsed, null, 2);
-    } else {
-      return JSON.stringify(parsed, null, 2);
-    }
-  }, [parsed, fileType]);
-  
-  // 异步生成 TOML 预览内容
-  const [tomlPreviewContent, setTomlPreviewContent] = useState<string>('');
+  // 智能预览内容（保留注释的原始内容 + 变更的值）
+  const [smartPreviewContent, setSmartPreviewContent] = useState<string>('');
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   
+  // 生成带注释的智能预览内容
   useEffect(() => {
-    const generateTomlPreview = async () => {
-      if (fileType === 'toml' && parsed) {
-        setIsGeneratingPreview(true);
-        try {
-          const { default: TOML } = await import('@iarna/toml');
-          const content = TOML.stringify(parsed as unknown as Parameters<typeof TOML.stringify>[0]);
-          setTomlPreviewContent(content);
-        } catch {
-          setTomlPreviewContent('');
-        } finally {
-          setIsGeneratingPreview(false);
+    const generateSmartPreview = async () => {
+      if (!originalContent || !parsed) {
+        setSmartPreviewContent(originalContent || '');
+        return;
+      }
+      
+      // 如果没有变更，直接显示原始内容
+      if (!hasChanges) {
+        setSmartPreviewContent(originalContent);
+        return;
+      }
+      
+      setIsGeneratingPreview(true);
+      try {
+        // 使用深比较收集变更（内联实现，避免依赖循环）
+        const changes: Array<{ path: string; value: unknown }> = [];
+        
+        const findChanges = (current: unknown, original: unknown, currentPath: string) => {
+          if (current === original) return;
+          
+          if (typeof current !== typeof original) {
+            changes.push({ path: currentPath, value: current });
+            return;
+          }
+          
+          if (typeof current !== 'object' || current === null || original === null) {
+            if (current !== original) {
+              changes.push({ path: currentPath, value: current });
+            }
+            return;
+          }
+          
+          if (Array.isArray(current) && Array.isArray(original)) {
+            const maxLen = Math.max(current.length, original.length);
+            for (let i = 0; i < maxLen; i++) {
+              const itemPath = `${currentPath}[${i}]`;
+              if (i >= original.length) {
+                changes.push({ path: itemPath, value: current[i] });
+              } else if (i >= current.length) {
+                changes.push({ path: itemPath, value: undefined });
+              } else {
+                findChanges(current[i], original[i], itemPath);
+              }
+            }
+            return;
+          }
+          
+          const currentObj = current as Record<string, unknown>;
+          const originalObj = original as Record<string, unknown>;
+          const allKeys = new Set([...Object.keys(currentObj), ...Object.keys(originalObj)]);
+          
+          for (const key of allKeys) {
+            const keyPath = currentPath ? `${currentPath}.${key}` : key;
+            if (!(key in originalObj)) {
+              changes.push({ path: keyPath, value: currentObj[key] });
+            } else if (!(key in currentObj)) {
+              changes.push({ path: keyPath, value: undefined });
+            } else {
+              findChanges(currentObj[key], originalObj[key], keyPath);
+            }
+          }
+        };
+        
+        findChanges(parsed, originalParsed, '');
+        
+        if (changes.length === 0) {
+          setSmartPreviewContent(originalContent);
+          return;
         }
+        
+        // 调用 API 进行智能替换预览
+        const res = await fetch('/api/mod-configs/file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            path: filePath,
+            content: originalContent,
+            format: fileType,
+            useSmartReplace: true,
+            changes: changes,
+            previewOnly: true,
+          }),
+        });
+        
+        await res.json();
+        
+        // 使用本地智能替换逻辑来生成预览
+        const preview = generateSmartPreviewLocal(originalContent, changes, fileType);
+        setSmartPreviewContent(preview);
+      } catch {
+        // 失败时回退到原始内容
+        setSmartPreviewContent(originalContent);
+      } finally {
+        setIsGeneratingPreview(false);
       }
     };
-    generateTomlPreview();
-  }, [parsed, fileType]);
+    
+    generateSmartPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [originalContent, parsed, hasChanges, fileType, filePath, originalParsed]);
   
-  // 获取最终预览内容
-  const finalPreviewContent = useMemo(() => {
-    if (fileType === 'toml') {
-      return tomlPreviewContent;
+  // 本地智能替换生成预览（简化版，仅用于预览）
+  const generateSmartPreviewLocal = (
+    originalContent: string, 
+    changes: Array<{ path: string; value: unknown }>, 
+    fileType: 'json' | 'json5' | 'toml'
+  ): string => {
+    // 按路径深度排序，先处理深层路径
+    const sortedChanges = [...changes].sort((a, b) => {
+      const depthA = a.path.split(/[.\[]/).length;
+      const depthB = b.path.split(/[.\[]/).length;
+      return depthB - depthA;
+    });
+    
+    let result = originalContent;
+    
+    for (const { path: keyPath, value } of sortedChanges) {
+      result = replaceValueForPreview(result, keyPath, value, fileType);
     }
-    return previewContent;
-  }, [previewContent, tomlPreviewContent, fileType]);
+    
+    return result;
+  };
+  
+  // 在内容中替换单个值（用于预览）
+  const replaceValueForPreview = (
+    content: string,
+    keyPath: string,
+    value: unknown,
+    fileType: 'json' | 'json5' | 'toml'
+  ): string => {
+    const keys = keyPath.split(/\.|\[(\d+)\]/).filter(Boolean);
+    if (keys.length === 0) return content;
+    
+    const lines = content.split('\n');
+    const targetKey = keys[keys.length - 1];
+    
+    // 简单的替换逻辑：查找目标键并替换值
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // 检查是否包含目标键
+      const keyPattern = new RegExp(`(["']?)${escapeRegex(targetKey)}\\1\\s*[:=]`);
+      if (keyPattern.test(line)) {
+        // 查找值的位置
+        const valueMatch = line.match(/[:=]\s*/);
+        if (!valueMatch) continue;
+        
+        const valueStart = line.indexOf(valueMatch[0]) + valueMatch[0].length;
+        const originalValueEnd = findValueEndInLine(line, valueStart);
+        
+        if (originalValueEnd > valueStart) {
+          const formattedValue = formatValueForPreview(value, fileType === 'json5');
+          lines[i] = line.slice(0, valueStart) + formattedValue + line.slice(originalValueEnd);
+          break;
+        }
+      }
+    }
+    
+    return lines.join('\n');
+  };
+  
+  // 查找行内值的结束位置
+  const findValueEndInLine = (line: string, start: number): number => {
+    let i = start;
+    let inString = false;
+    let stringChar = '';
+    let depth = 0;
+    
+    while (i < line.length) {
+      const char = line[i];
+      
+      if (!inString) {
+        if (char === '"' || char === "'") {
+          inString = true;
+          stringChar = char;
+          i++;
+          continue;
+        }
+        if (char === '{' || char === '[') {
+          depth++;
+        } else if (char === '}' || char === ']') {
+          if (depth === 0) return i;
+          depth--;
+        }
+        if (depth === 0 && (char === ',' || char === '#' || char === '/')) {
+          // 回溯到上一个非空白字符
+          let j = i - 1;
+          while (j > start && /\s/.test(line[j])) j--;
+          return j + 1;
+        }
+      } else {
+        if (char === stringChar && line[i - 1] !== '\\') {
+          inString = false;
+        }
+      }
+      i++;
+    }
+    
+    return line.length;
+  };
+  
+  // 格式化值用于预览
+  const formatValueForPreview = (value: unknown, isJson5: boolean): string => {
+    if (value === null) return 'null';
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'string') return JSON.stringify(value);
+    if (Array.isArray(value)) {
+      const items = value.map(v => formatValueForPreview(v, isJson5)).join(', ');
+      return `[${items}]`;
+    }
+    if (typeof value === 'object') {
+      const entries = Object.entries(value as Record<string, unknown>)
+        .map(([k, v]) => `${JSON.stringify(k)}: ${formatValueForPreview(v, isJson5)}`)
+        .join(', ');
+      return `{${entries}}`;
+    }
+    return String(value);
+  };
+  
+  // 获取最终预览内容（优先使用智能预览）
+  const finalPreviewContent = useMemo(() => {
+    // 如果没有变更，直接显示原始内容
+    if (!hasChanges) {
+      return originalContent;
+    }
+    // 如果有智能预览，使用它；否则回退到原始内容
+    return smartPreviewContent || originalContent;
+  }, [smartPreviewContent, originalContent, hasChanges]);
   
   // 监听 parsed 变化，与原始内容比较以确定是否有更改
   useEffect(() => {
@@ -1654,8 +1914,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   // 提取配置项
   const configValues = useMemo(() => {
     if (!parsed) return [];
-    return extractConfigValues(parsed, content);
-  }, [parsed, content]);
+    return extractConfigValues(parsed, content, '', 0, false, fileType);
+  }, [parsed, content, fileType]);
   
   // 过滤出顶层配置项
   const topLevelConfigs = useMemo(() => {

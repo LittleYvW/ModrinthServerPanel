@@ -312,7 +312,7 @@ function findValueEnd(line: string, start: number): number {
         continue;
       }
     } else {
-      if (char === stringChar && prevChar !== '\\') {
+      if (char === stringChar && line[i - 1] !== '\\') {
         inString = false;
         stringChar = '';
       }

@@ -753,18 +753,22 @@ const ConfigItemEditor = ({
           initial={false}
           animate={isModified ? {
             backgroundColor: modifiedColors.bg,
-            boxShadow: modifiedColors.boxShadow,
           } : {
             backgroundColor: 'rgba(0, 0, 0, 0)',
-            boxShadow: isExpanded 
-              ? '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)' 
-              : '0 0 0 0 rgba(0, 0, 0, 0)',
           }}
           transition={{ 
-            duration: 0.4, 
-            ease: [0.25, 0.1, 0.25, 1],
+            duration: 0.2, 
+            ease: [0.4, 0, 0.2, 1],
           }}
         >
+          {/* 阴影层 - 通过 opacity 动画避免闪现 */}
+          <motion.div
+            className="absolute inset-0 rounded-lg pointer-events-none"
+            style={{ boxShadow: modifiedColors.boxShadow }}
+            initial={false}
+            animate={{ opacity: isModified ? 1 : 0 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+          />
           {/* 未保存指示器 - 渐变发光效果 */}
           {isModified && (
             <>
@@ -1061,16 +1065,22 @@ const ConfigItemEditor = ({
         initial={false}
         animate={isModified ? {
           backgroundColor: modifiedColors.bg,
-          boxShadow: modifiedColors.boxShadow,
         } : {
           backgroundColor: 'rgba(0, 0, 0, 0)',
-          boxShadow: '0 0 0 0 rgba(0, 0, 0, 0)',
         }}
         transition={{ 
-          duration: 0.35, 
-          ease: [0.25, 0.1, 0.25, 1],
+          duration: 0.2, 
+          ease: [0.4, 0, 0.2, 1],
         }}
       >
+        {/* 阴影层 - 通过 opacity 动画避免闪现 */}
+        <motion.div
+          className="absolute inset-0 rounded-lg pointer-events-none"
+          style={{ boxShadow: modifiedColors.boxShadow }}
+          initial={false}
+          animate={{ opacity: isModified ? 1 : 0 }}
+          transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+        />
         {/* 未保存指示器 - 渐变发光效果 */}
         {isModified && (
           <>

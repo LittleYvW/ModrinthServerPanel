@@ -1603,6 +1603,15 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   const [saveSuccess, setSaveSuccess] = useState(false);
   // 用于防止 compareContent useEffect 在保存成功态显示期间覆盖 hasChanges
   const isSaveSuccessPendingRef = useRef(false);
+  // 用于记录在保存成功态动画期间是否有修改，动画结束后需要重新触发未保存状态
+  const changesDuringSaveSuccessRef = useRef(false);
+  // 用于在回调中获取最新的 saveSuccess 状态
+  const saveSuccessRef = useRef(false);
+  
+  // 同步 saveSuccessRef 与 saveSuccess 状态
+  useEffect(() => {
+    saveSuccessRef.current = saveSuccess;
+  }, [saveSuccess]);
   
   // 深度比较两个值是否相等
   const isDeepEqual = useCallback((a: unknown, b: unknown): boolean => {
@@ -2084,6 +2093,11 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   
   // 处理值变更
   const handleValueChange = useCallback((path: string, newValue: unknown) => {
+    // 如果在保存成功态动画期间修改，记录这个变化
+    if (saveSuccessRef.current) {
+      changesDuringSaveSuccessRef.current = true;
+    }
+    
     setParsed((prev: unknown) => {
       const newParsed = JSON.parse(JSON.stringify(prev));
       
@@ -2158,6 +2172,11 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   
   // 处理数组增删
   const handleArrayChange = useCallback((path: string, action: 'add' | 'remove', index?: number) => {
+    // 如果在保存成功态动画期间修改，记录这个变化
+    if (saveSuccessRef.current) {
+      changesDuringSaveSuccessRef.current = true;
+    }
+    
     setParsed((prev: unknown) => {
       const newParsed = JSON.parse(JSON.stringify(prev));
       
@@ -2398,8 +2417,39 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
       // 这样可以让成功态动画完整播放，不会与未保存指示器的退出动画冲突
       setTimeout(() => {
         setSaveSuccess(false);
-        // 在成功态消失后再清除 hasChanges，避免布局动画干扰
-        setHasChanges(false);
+        // 检查动画期间是否有修改
+        if (changesDuringSaveSuccessRef.current) {
+          // 如果有修改，重新计算 hasChanges 而不是直接设为 false
+          changesDuringSaveSuccessRef.current = false;
+          // 触发一次比较以更新 hasChanges
+          const compareContent = async () => {
+            if (!parsed || !originalContent) {
+              setHasChanges(false);
+              return;
+            }
+            try {
+              let originalParsedData: unknown;
+              if (fileType === 'toml') {
+                const { parse: parseTOML } = await import('@iarna/toml');
+                originalParsedData = parseTOML(originalContent);
+              } else if (fileType === 'json5') {
+                const JSON5 = await import('json5');
+                originalParsedData = JSON5.parse(originalContent);
+              } else {
+                originalParsedData = JSON.parse(originalContent);
+              }
+              const changed = !isDeepEqual(parsed, originalParsedData);
+              setHasChanges(changed);
+            } catch {
+              // 解析失败时，如果有修改记录则设为 true
+              setHasChanges(true);
+            }
+          };
+          compareContent();
+        } else {
+          // 没有修改，正常清除 hasChanges
+          setHasChanges(false);
+        }
         // 清除标志，允许 compareContent 正常工作
         isSaveSuccessPendingRef.current = false;
       }, 2500);

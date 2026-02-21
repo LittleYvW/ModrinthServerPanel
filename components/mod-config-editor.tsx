@@ -1531,6 +1531,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [hasChanges, setHasChanges] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  // 用于防止 compareContent useEffect 在保存成功态显示期间覆盖 hasChanges
+  const isSaveSuccessPendingRef = useRef(false);
   
   // 深度比较两个值是否相等
   const isDeepEqual = useCallback((a: unknown, b: unknown): boolean => {
@@ -1928,6 +1930,11 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         return;
       }
       
+      // 如果保存成功态正在显示中，跳过比较，避免干扰成功态动画
+      if (isSaveSuccessPendingRef.current) {
+        return;
+      }
+      
       try {
         let originalParsed: unknown;
         if (fileType === 'toml') {
@@ -2260,7 +2267,11 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
         // 没有变更，直接显示成功状态
         setSaving(false);
         setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 1500);
+        isSaveSuccessPendingRef.current = true;
+        setTimeout(() => {
+          setSaveSuccess(false);
+          isSaveSuccessPendingRef.current = false;
+        }, 1500);
         return;
       }
       
@@ -2292,18 +2303,25 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
       setOriginalParsed(parsed);
       setOriginalContent(savedContent);
       setContent(savedContent);
-      setHasChanges(false);
       
-      // 显示成功状态
+      // 先关闭保存中状态，显示成功状态
+      // 注意：此时 hasChanges 仍为 true，避免与未保存指示器的退出动画冲突
       setSaving(false);
       setSaveSuccess(true);
+      // 设置标志，防止 compareContent useEffect 在此期间覆盖 hasChanges
+      isSaveSuccessPendingRef.current = true;
       
       // 触发保存回调
       onSave?.();
       
-      // 延迟关闭成功状态
+      // 延迟关闭成功状态和清除 hasChanges
+      // 这样可以让成功态动画完整播放，不会与未保存指示器的退出动画冲突
       setTimeout(() => {
         setSaveSuccess(false);
+        // 在成功态消失后再清除 hasChanges，避免布局动画干扰
+        setHasChanges(false);
+        // 清除标志，允许 compareContent 正常工作
+        isSaveSuccessPendingRef.current = false;
       }, 2500);
       
     } catch (err) {
@@ -2311,6 +2329,8 @@ export function ModConfigEditor({ modId, modName, filePath, fileType, onClose, o
       setError(err instanceof Error ? err.message : '保存失败，请重试');
       setSaving(false);
       setSaveSuccess(false);
+      // 保存失败时也要重置标志
+      isSaveSuccessPendingRef.current = false;
     }
   };
   

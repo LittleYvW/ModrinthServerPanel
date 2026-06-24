@@ -1,69 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMods } from '@/lib/db';
-import fs from 'fs';
-import path from 'path';
-import { getConfig } from '@/lib/db';
+import { getVersion } from '@/lib/modrinth';
 
-// 获取模组文件下载
+// 获取模组文件下载 - 从 Modrinth CDN 获取
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const modId = searchParams.get('modId');
-    
+
     if (!modId) {
       return NextResponse.json(
         { error: 'Missing modId' },
         { status: 400 }
       );
     }
-    
+
     const mods = getMods();
     const mod = mods.find(m => m.id === modId);
-    
+
     if (!mod) {
       return NextResponse.json(
         { error: 'Mod not found' },
         { status: 404 }
       );
     }
-    
-    const config = getConfig();
-    if (!config.path) {
+
+    if (!mod.versionId) {
       return NextResponse.json(
-        { error: 'Server path not configured' },
+        { error: 'Mod version ID missing' },
         { status: 500 }
       );
     }
-    
-    // 根据模组分类确定文件位置
-    let filePath: string;
-    if (mod.category === 'client-only') {
-      // 客户端模组在 .client/ 目录
-      filePath = path.join(config.path, 'mods', '.client', mod.filename);
-    } else {
-      // 检查模组是否启用
-      if (mod.enabled === false) {
-        return NextResponse.json(
-          { error: 'Mod is disabled' },
-          { status: 403 }
-        );
-      }
-      filePath = path.join(config.path, 'mods', mod.filename);
-    }
-    
-    if (!fs.existsSync(filePath)) {
+
+    // 从 Modrinth API 获取版本详情，拿到文件下载链接
+    const version = await getVersion(mod.versionId);
+    const primaryFile = version.files?.find((f: { primary: boolean }) => f.primary) || version.files?.[0];
+
+    if (!primaryFile || !primaryFile.url) {
       return NextResponse.json(
-        { error: 'File not found' },
+        { error: 'File not found on Modrinth' },
         { status: 404 }
       );
     }
-    
-    const fileBuffer = fs.readFileSync(filePath);
-    
+
+    // 从 Modrinth CDN 下载文件
+    const cdnRes = await fetch(primaryFile.url);
+    if (!cdnRes.ok) {
+      return NextResponse.json(
+        { error: `Modrinth CDN returned ${cdnRes.status}` },
+        { status: 502 }
+      );
+    }
+
+    const fileBuffer = await cdnRes.arrayBuffer();
+
     return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': 'application/java-archive',
-        'Content-Disposition': `attachment; filename="${mod.filename}"`,
+        'Content-Disposition': `attachment; filename="${primaryFile.filename || mod.filename}"`,
       },
     });
   } catch {
@@ -74,36 +68,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 批量下载 - 返回所有双端模组的打包
+// 批量下载 - 返回所有双端模组的下载链接
 export async function POST() {
   try {
-    const config = getConfig();
-    if (!config.path) {
-      return NextResponse.json(
-        { error: 'Server path not configured' },
-        { status: 500 }
-      );
-    }
-    
     const mods = getMods();
     const bothMods = mods.filter(m => m.category === 'both' && m.enabled !== false);
-    
-    // 收集所有文件路径
-    const files: { name: string; path: string }[] = [];
-    for (const mod of bothMods) {
-      let filePath: string;
-      if (mod.category === 'client-only') {
-        filePath = path.join(config.path, 'mods', '.client', mod.filename);
-      } else {
-        filePath = path.join(config.path, 'mods', mod.filename);
-      }
-      if (fs.existsSync(filePath)) {
-        files.push({ name: mod.filename, path: filePath });
-      }
-    }
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       mods: bothMods.map(m => ({
         id: m.id,
         name: m.name,

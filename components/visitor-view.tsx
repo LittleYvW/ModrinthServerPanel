@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Download, Package, Users, Server, Loader2, Monitor, Star, Box, Wrench } from 'lucide-react';
+import { Download, Package, Users, Server, Loader2, Monitor, Star, Box, Wrench, Check } from 'lucide-react';
 import { 
   fadeIn, 
   fadeInUp, 
@@ -65,6 +65,8 @@ export function VisitorView() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [batchDownloading, setBatchDownloading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [batchCompleted, setBatchCompleted] = useState(false);
 
   useEffect(() => {
     fetchMods();
@@ -112,22 +114,32 @@ export function VisitorView() {
   };
 
   const downloadAll = async () => {
+    setBatchProgress({ current: 0, total: mods.both.length });
     setBatchDownloading(true);
+    setBatchCompleted(false);
     try {
-      for (const mod of mods.both) {
-        await downloadMod(mod.id);
+      for (let i = 0; i < mods.both.length; i++) {
+        await downloadMod(mods.both[i].id);
+        setBatchProgress({ current: i + 1, total: mods.both.length });
       }
+      setBatchCompleted(true);
+      setTimeout(() => setBatchCompleted(false), 1500);
     } finally {
       setBatchDownloading(false);
     }
   };
 
   const downloadAllClientMods = async () => {
+    setBatchProgress({ current: 0, total: mods.clientOnly.length });
     setBatchDownloading(true);
+    setBatchCompleted(false);
     try {
-      for (const mod of mods.clientOnly) {
-        await downloadMod(mod.id);
+      for (let i = 0; i < mods.clientOnly.length; i++) {
+        await downloadMod(mods.clientOnly[i].id);
+        setBatchProgress({ current: i + 1, total: mods.clientOnly.length });
       }
+      setBatchCompleted(true);
+      setTimeout(() => setBatchCompleted(false), 1500);
     } finally {
       setBatchDownloading(false);
     }
@@ -236,18 +248,38 @@ export function VisitorView() {
                 disabled={batchDownloading}
                 className="bg-[#00d17a] hover:bg-[#00b86b] text-black font-semibold px-6"
               >
-                {batchDownloading ? (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                    className="mr-2"
-                  >
-                    <Loader2 className="w-4 h-4" />
-                  </motion.div>
+                {batchCompleted ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    完成
+                  </>
+                ) : batchDownloading ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                      className="mr-2"
+                    >
+                      <Loader2 className="w-4 h-4" />
+                    </motion.div>
+                    <span className="flex items-center gap-1">
+                      <motion.span
+                        key={`both-progress-${batchProgress.current}`}
+                        initial={{ opacity: 0, scale: 1.5, y: 4 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                      >
+                        {batchProgress.current}
+                      </motion.span>
+                      <span>/{batchProgress.total}</span>
+                    </span>
+                  </>
                 ) : (
-                  <Download className="w-4 h-4 mr-2" />
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    下载全部 ({mods.both.length} 个)
+                  </>
                 )}
-                下载全部 ({mods.both.length} 个)
               </Button>
             </motion.div>
           </motion.div>
@@ -385,18 +417,38 @@ export function VisitorView() {
                       disabled={batchDownloading}
                       className="border-[#f1c40f]/50 text-[#f1c40f] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10 hover:border-[#f1c40f] text-xs h-8"
                     >
-                      {batchDownloading ? (
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                          className="mr-1"
-                        >
-                          <Loader2 className="w-3 h-3" />
-                        </motion.div>
+                      {batchCompleted ? (
+                        <>
+                          <Check className="w-3 h-3 mr-1" />
+                          完成
+                        </>
+                      ) : batchDownloading ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                            className="mr-1"
+                          >
+                            <Loader2 className="w-3 h-3" />
+                          </motion.div>
+                          <span className="flex items-center gap-1">
+                            <motion.span
+                              key={`client-progress-${batchProgress.current}`}
+                              initial={{ opacity: 0, scale: 1.5, y: 4 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                            >
+                              {batchProgress.current}
+                            </motion.span>
+                            <span>/{batchProgress.total}</span>
+                          </span>
+                        </>
                       ) : (
-                        <Download className="w-3 h-3 mr-1" />
+                        <>
+                          <Download className="w-3 h-3 mr-1" />
+                          下载全部
+                        </>
                       )}
-                      下载全部
                     </Button>
                   </motion.div>
                 </div>

@@ -63,6 +63,7 @@ export function VisitorView() {
     loaderVersion: '',
   });
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMods();
@@ -90,6 +91,7 @@ export function VisitorView() {
   };
 
   const downloadMod = async (modId: string) => {
+    setDownloading(modId);
     try {
       const res = await fetch(`/api/download?modId=${modId}`);
       if (!res.ok) throw new Error('获取下载链接失败');
@@ -103,6 +105,8 @@ export function VisitorView() {
     } catch (error) {
       console.error('Download error:', error);
       alert('下载失败');
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -305,9 +309,19 @@ export function VisitorView() {
                           size="sm"
                           variant="outline"
                           onClick={() => downloadMod(mod.id)}
+                          disabled={downloading === mod.id}
                           className="border-[#2a2a2a] hover:border-[#00d17a] hover:text-[#00d17a] flex-shrink-0"
                         >
-                          <Download className="w-4 h-4" />
+                          {downloading === mod.id ? (
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                            >
+                              <Loader2 className="w-4 h-4" />
+                            </motion.div>
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
                         </Button>
                       </motion.div>
                     </motion.div>
@@ -408,9 +422,19 @@ export function VisitorView() {
                             size="sm"
                             variant="outline"
                             onClick={() => downloadMod(mod.id)}
+                            disabled={downloading === mod.id}
                             className="border-[#2a2a2a] hover:border-[#f1c40f] hover:text-[#f1c40f] flex-shrink-0"
                           >
-                            <Download className="w-4 h-4" />
+                            {downloading === mod.id ? (
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                              >
+                                <Loader2 className="w-4 h-4" />
+                              </motion.div>
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
                           </Button>
                         </motion.div>
                       </motion.div>

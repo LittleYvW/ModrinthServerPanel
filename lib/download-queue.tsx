@@ -72,28 +72,6 @@ export function DownloadQueueProvider({ children }: { children: React.ReactNode 
     );
 
     try {
-      // 模拟进度更新（实际项目中可以使用 EventSource 或 WebSocket 获取实时进度）
-      const progressInterval = setInterval(() => {
-        setTasks((prev) => {
-          const currentTask = prev.find((t) => t.id === taskId);
-          if (!currentTask || currentTask.status !== 'downloading') {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          
-          const newProgress = Math.min(currentTask.progress + Math.random() * 15, 95);
-          const speed = `${(Math.random() * 5 + 1).toFixed(1)} MB/s`;
-          
-          if (newProgress >= 95) {
-            clearInterval(progressInterval);
-          }
-          
-          return prev.map((t) =>
-            t.id === taskId ? { ...t, progress: newProgress, speed } : t
-          );
-        });
-      }, 300);
-
       // 发送下载请求
       const response = await fetch('/api/mods', {
         method: 'POST',
@@ -105,36 +83,119 @@ export function DownloadQueueProvider({ children }: { children: React.ReactNode 
         signal: controller.signal,
       });
 
-      clearInterval(progressInterval);
-
+      // 非 2xx 响应：前置校验失败，解析为普通 JSON 错误
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: '下载失败' }));
         throw new Error(errorData.error || '下载失败');
       }
 
-      const result = await response.json();
+      if (!response.body) {
+        throw new Error('无法读取下载流');
+      }
 
-      // 下载完成
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId
-            ? {
-                ...t,
-                status: 'completed',
-                progress: 100,
-                speed: '-',
-                completedAt: new Date(),
-                filename: result.mod?.filename || t.filename,
+      // 读取 NDJSON 流
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let lastLoaded = 0;
+      let lastTime = Date.now();
+      let downloadComplete = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // 按行分割（NDJSON：每行一个 JSON 对象）
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 保留最后不完整的行
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          let event: {
+            type: string;
+            loaded?: number;
+            total?: number;
+            success?: boolean;
+            mod?: { filename?: string };
+            error?: string;
+          };
+          try {
+            event = JSON.parse(line);
+          } catch {
+            continue; // 跳过无法解析的行
+          }
+
+          if (event.type === 'progress') {
+            const loaded = event.loaded || 0;
+            const total = event.total || 0;
+            const now = Date.now();
+            const elapsedSec = (now - lastTime) / 1000;
+            const bytesDiff = loaded - lastLoaded;
+
+            // 计算实时速度
+            let speed = '-';
+            if (elapsedSec > 0 && bytesDiff > 0) {
+              const speedMBs = bytesDiff / elapsedSec / (1024 * 1024);
+              if (speedMBs >= 1) {
+                speed = `${speedMBs.toFixed(1)} MB/s`;
+              } else {
+                const speedKBs = bytesDiff / elapsedSec / 1024;
+                speed = `${speedKBs.toFixed(0)} KB/s`;
               }
-            : t
-        )
-      );
+            }
+
+            // 计算进度百分比（Content-Length 缺失时为 0，进度不更新）
+            const progress = total > 0 ? Math.min((loaded / total) * 100, 100) : 0;
+
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === taskId ? { ...t, progress, speed } : t
+              )
+            );
+
+            lastLoaded = loaded;
+            lastTime = now;
+          } else if (event.type === 'result') {
+            if (event.success) {
+              setTasks((prev) =>
+                prev.map((t) =>
+                  t.id === taskId
+                    ? {
+                        ...t,
+                        status: 'completed' as DownloadStatus,
+                        progress: 100,
+                        speed: '-',
+                        completedAt: new Date(),
+                        filename: event.mod?.filename || t.filename,
+                      }
+                    : t
+                )
+              );
+              downloadComplete = true;
+            } else {
+              throw new Error(event.error || '下载失败');
+            }
+          } else if (event.type === 'error') {
+            throw new Error(event.error || '下载失败');
+          }
+        }
+
+        if (downloadComplete) break;
+      }
+
+      // 流结束但未收到 result 事件
+      if (!downloadComplete) {
+        throw new Error('下载流意外结束');
+      }
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
         setTasks((prev) =>
           prev.map((t) =>
             t.id === taskId
-              ? { ...t, status: 'error', error: '已取消', speed: '-' }
+              ? { ...t, status: 'error' as DownloadStatus, error: '已取消', speed: '-' }
               : t
           )
         );
@@ -142,7 +203,7 @@ export function DownloadQueueProvider({ children }: { children: React.ReactNode 
         setTasks((prev) =>
           prev.map((t) =>
             t.id === taskId
-              ? { ...t, status: 'error', error: (error as Error).message, speed: '-' }
+              ? { ...t, status: 'error' as DownloadStatus, error: (error as Error).message, speed: '-' }
               : t
           )
         );

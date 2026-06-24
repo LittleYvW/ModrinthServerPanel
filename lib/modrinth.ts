@@ -128,10 +128,27 @@ export function analyzeEnvironment(data: { client_support?: string; server_suppo
   };
 }
 
+// 下载进度信息
+export interface DownloadProgress {
+  loaded: number;  // 已下载字节
+  total: number;   // 总字节（若 Content-Length 缺失则为 0）
+}
+
 // 下载文件
-export async function downloadFile(url: string): Promise<ArrayBuffer> {
-  const response = await axios.get(url, {
+export async function downloadFile(
+  url: string,
+  onProgress?: (progress: DownloadProgress) => void
+): Promise<ArrayBuffer> {
+  const response = await axios.get<ArrayBuffer>(url, {
     responseType: 'arraybuffer',
+    onDownloadProgress: (progressEvent) => {
+      if (onProgress) {
+        onProgress({
+          loaded: progressEvent.loaded || 0,
+          total: progressEvent.total || 0,
+        });
+      }
+    },
   });
   return response.data;
 }

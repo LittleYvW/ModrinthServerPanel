@@ -32,93 +32,127 @@ export async function GET() {
   }
 }
 
-// 添加模组
+// 添加模组 - 流式 NDJSON 响应，推送真实下载进度
 export async function POST(request: NextRequest) {
-  try {
-    const { projectId, versionId } = await request.json();
-    
-    if (!projectId || !versionId) {
-      return NextResponse.json(
-        { error: 'Missing projectId or versionId' },
-        { status: 400 }
-      );
-    }
-    
-    // 获取项目详情
-    const project = await getProject(projectId);
-    
-    // 获取版本详情
-    const versions = await getProjectVersions(projectId);
-    const version = versions.find((v: { id: string }) => v.id === versionId);
-    
-    if (!version) {
-      return NextResponse.json(
-        { error: 'Version not found' },
-        { status: 404 }
-      );
-    }
-    
-    // 分析环境 - 使用 project 对象的环境信息（version 对象不包含 client_support/server_support）
-    const env = analyzeEnvironment(project);
-    
-    // 获取主文件
-    const primaryFile = version.files.find((f: { primary: boolean }) => f.primary) || version.files[0];
-    
-    if (!primaryFile) {
-      return NextResponse.json(
-        { error: 'No file found for this version' },
-        { status: 404 }
-      );
-    }
-    
-    // 下载文件到服务端目录
-    const config = getConfig();
-    if (config.path) {
-      // 根据分类决定存放目录
-      const isClientOnly = env.category === 'client-only';
-      const targetDir = isClientOnly 
-        ? path.join(config.path, 'mods', '.client')
-        : path.join(config.path, 'mods');
-      
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
-      }
-      
-      const { downloadFile } = await import('@/lib/modrinth');
-      const fileData = await downloadFile(primaryFile.url);
-      fs.writeFileSync(path.join(targetDir, primaryFile.filename), Buffer.from(fileData));
-    }
-    
-    // 创建模组记录
-    const mod: Mod = {
-      id: projectId,
-      slug: project.slug,
-      name: project.title,
-      versionId: versionId,
-      filename: primaryFile.filename,
-      environment: {
-        client: project.client_side || 'required',
-        server: project.server_side || 'required',
-      },
-      category: env.category,
-      installedAt: new Date().toISOString(),
-      iconUrl: project.icon_url,
-      description: project.description,
-      versionNumber: version.version_number,
-      enabled: true, // 新模组默认启用
-      recommended: false, // 客户端模组默认不推荐
-    };
-    
-    addMod(mod);
-    
-    return NextResponse.json({ success: true, mod });
-  } catch (error) {
-    console.error('Add mod error:', error);
+  const body = await request.json().catch(() => null);
+  const { projectId, versionId } = body || {};
+
+  // 前置校验：直接返回 HTTP 错误（非流式）
+  if (!projectId || !versionId) {
     return NextResponse.json(
-      { error: 'Failed to add mod' },
-      { status: 500 }
+      { error: 'Missing projectId or versionId' },
+      { status: 400 }
     );
   }
+
+  const encoder = new TextEncoder();
+  let cancelled = false;
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (data: unknown) => {
+        if (cancelled) return;
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(data) + '\n'));
+        } catch {
+          // controller 已关闭
+        }
+      };
+
+      try {
+        // 获取项目详情
+        const project = await getProject(projectId);
+
+        // 获取版本详情
+        const versions = await getProjectVersions(projectId);
+        const version = versions.find((v: { id: string }) => v.id === versionId);
+
+        if (!version) {
+          send({ type: 'error', error: 'Version not found' });
+          return;
+        }
+
+        // 分析环境
+        const env = analyzeEnvironment(project);
+
+        // 获取主文件
+        const primaryFile = version.files.find((f: { primary: boolean }) => f.primary) || version.files[0];
+
+        if (!primaryFile) {
+          send({ type: 'error', error: 'No file found for this version' });
+          return;
+        }
+
+        // 下载文件到服务端目录
+        const config = getConfig();
+        if (config.path) {
+          // 根据分类决定存放目录
+          const isClientOnly = env.category === 'client-only';
+          const targetDir = isClientOnly
+            ? path.join(config.path, 'mods', '.client')
+            : path.join(config.path, 'mods');
+
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+          }
+
+          const { downloadFile } = await import('@/lib/modrinth');
+          const fileData = await downloadFile(primaryFile.url, (progress) => {
+            send({ type: 'progress', loaded: progress.loaded, total: progress.total });
+          });
+          if (cancelled) return;
+          fs.writeFileSync(path.join(targetDir, primaryFile.filename), Buffer.from(fileData));
+        }
+
+        if (cancelled) return;
+
+        // 创建模组记录
+        const mod: Mod = {
+          id: projectId,
+          slug: project.slug,
+          name: project.title,
+          versionId: versionId,
+          filename: primaryFile.filename,
+          environment: {
+            client: project.client_side || 'required',
+            server: project.server_side || 'required',
+          },
+          category: env.category,
+          installedAt: new Date().toISOString(),
+          iconUrl: project.icon_url,
+          description: project.description,
+          versionNumber: version.version_number,
+          enabled: true,
+          recommended: false,
+        };
+
+        addMod(mod);
+
+        send({ type: 'result', success: true, mod });
+      } catch (error) {
+        console.error('Add mod error:', error);
+        send({ type: 'error', error: 'Failed to add mod' });
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          // 已关闭
+        }
+      }
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  });
 }
 
 // 删除模组

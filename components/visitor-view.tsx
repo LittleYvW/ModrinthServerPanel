@@ -64,6 +64,7 @@ export function VisitorView() {
   });
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [batchDownloading, setBatchDownloading] = useState(false);
 
   useEffect(() => {
     fetchMods();
@@ -111,14 +112,24 @@ export function VisitorView() {
   };
 
   const downloadAll = async () => {
-    for (const mod of mods.both) {
-      await downloadMod(mod.id);
+    setBatchDownloading(true);
+    try {
+      for (const mod of mods.both) {
+        await downloadMod(mod.id);
+      }
+    } finally {
+      setBatchDownloading(false);
     }
   };
 
   const downloadAllClientMods = async () => {
-    for (const mod of mods.clientOnly) {
-      await downloadMod(mod.id);
+    setBatchDownloading(true);
+    try {
+      for (const mod of mods.clientOnly) {
+        await downloadMod(mod.id);
+      }
+    } finally {
+      setBatchDownloading(false);
     }
   };
 
@@ -222,9 +233,20 @@ export function VisitorView() {
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Button
                 onClick={downloadAll}
+                disabled={batchDownloading}
                 className="bg-[#00d17a] hover:bg-[#00b86b] text-black font-semibold px-6"
               >
-                <Download className="w-4 h-4 mr-2" />
+                {batchDownloading ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                    className="mr-2"
+                  >
+                    <Loader2 className="w-4 h-4" />
+                  </motion.div>
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
                 下载全部 ({mods.both.length} 个)
               </Button>
             </motion.div>
@@ -360,9 +382,20 @@ export function VisitorView() {
                       size="sm"
                       variant="outline"
                       onClick={downloadAllClientMods}
+                      disabled={batchDownloading}
                       className="border-[#f1c40f]/50 text-[#f1c40f] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10 hover:border-[#f1c40f] text-xs h-8"
                     >
-                      <Download className="w-3 h-3 mr-1" />
+                      {batchDownloading ? (
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                          className="mr-1"
+                        >
+                          <Loader2 className="w-3 h-3" />
+                        </motion.div>
+                      ) : (
+                        <Download className="w-3 h-3 mr-1" />
+                      )}
                       下载全部
                     </Button>
                   </motion.div>

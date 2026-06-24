@@ -261,9 +261,9 @@ export function VisitorView() {
               <Button
                 onClick={downloadAll}
                 disabled={batchDownloading}
-                className="bg-[#00d17a] hover:bg-[#00b86b] text-black font-semibold px-6"
+                className="bg-[#00d17a] hover:bg-[#00b86b] text-black font-semibold px-6 min-w-[140px]"
               >
-                <AnimatePresence mode="popLayout" initial={false}>
+                <AnimatePresence mode="wait" initial={false}>
                   {batchCompleted ? (
                     <motion.span
                       key="both-done"
@@ -453,9 +453,9 @@ export function VisitorView() {
                       variant="outline"
                       onClick={downloadAllClientMods}
                       disabled={batchDownloading}
-                      className="border-[#f1c40f]/50 text-[#f1c40f] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10 hover:border-[#f1c40f] text-xs h-8"
+                      className="border-[#f1c40f]/50 text-[#f1c40f] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10 hover:border-[#f1c40f] text-xs h-8 min-w-[100px]"
                     >
-                      <AnimatePresence mode="popLayout" initial={false}>
+                      <AnimatePresence mode="wait" initial={false}>
                         {batchCompleted ? (
                           <motion.span
                             key="client-done"

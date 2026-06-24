@@ -63,8 +63,6 @@ export function VisitorView() {
     loaderVersion: '',
   });
   const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [batchDownloadingClient, setBatchDownloadingClient] = useState(false);
 
   useEffect(() => {
     fetchMods();
@@ -91,42 +89,32 @@ export function VisitorView() {
     }
   };
 
-  const downloadMod = async (modId: string, filename: string) => {
-    setDownloading(modId);
+  const downloadMod = async (modId: string) => {
     try {
       const res = await fetch(`/api/download?modId=${modId}`);
-      if (!res.ok) throw new Error('Download failed');
-      
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      if (!res.ok) throw new Error('获取下载链接失败');
+      const { downloadUrl } = await res.json();
+
       const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
+      a.href = downloadUrl;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
       console.error('Download error:', error);
       alert('下载失败');
-    } finally {
-      setDownloading(null);
     }
   };
 
   const downloadAll = async () => {
-    // 仅下载双端必需模组
     for (const mod of mods.both) {
-      await downloadMod(mod.id, mod.filename);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await downloadMod(mod.id);
     }
   };
 
   const downloadAllClientMods = async () => {
-    // 仅下载推荐客户端模组
     for (const mod of mods.clientOnly) {
-      await downloadMod(mod.id, mod.filename);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await downloadMod(mod.id);
     }
   };
 
@@ -316,20 +304,10 @@ export function VisitorView() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => downloadMod(mod.id, mod.filename)}
-                          disabled={downloading === mod.id}
+                          onClick={() => downloadMod(mod.id)}
                           className="border-[#2a2a2a] hover:border-[#00d17a] hover:text-[#00d17a] flex-shrink-0"
                         >
-                          {downloading === mod.id ? (
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                            >
-                              <Loader2 className="w-4 h-4" />
-                            </motion.div>
-                          ) : (
-                            <Download className="w-4 h-4" />
-                          )}
+                          <Download className="w-4 h-4" />
                         </Button>
                       </motion.div>
                     </motion.div>
@@ -367,25 +345,10 @@ export function VisitorView() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={async () => {
-                        setBatchDownloadingClient(true);
-                        await downloadAllClientMods();
-                        setBatchDownloadingClient(false);
-                      }}
-                      disabled={batchDownloadingClient}
+                      onClick={downloadAllClientMods}
                       className="border-[#f1c40f]/50 text-[#f1c40f] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10 hover:border-[#f1c40f] text-xs h-8"
                     >
-                      {batchDownloadingClient ? (
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                          className="mr-1"
-                        >
-                          <Loader2 className="w-3 h-3" />
-                        </motion.div>
-                      ) : (
-                        <Download className="w-3 h-3 mr-1" />
-                      )}
+                      <Download className="w-3 h-3 mr-1" />
                       下载全部
                     </Button>
                   </motion.div>
@@ -444,20 +407,10 @@ export function VisitorView() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => downloadMod(mod.id, mod.filename)}
-                            disabled={downloading === mod.id}
+                            onClick={() => downloadMod(mod.id)}
                             className="border-[#2a2a2a] hover:border-[#f1c40f] hover:text-[#f1c40f] flex-shrink-0"
                           >
-                            {downloading === mod.id ? (
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                              >
-                                <Loader2 className="w-4 h-4" />
-                              </motion.div>
-                            ) : (
-                              <Download className="w-4 h-4" />
-                            )}
+                            <Download className="w-4 h-4" />
                           </Button>
                         </motion.div>
                       </motion.div>

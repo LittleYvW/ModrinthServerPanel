@@ -90,7 +90,9 @@ export async function getProjectVersions(
 
 // 获取版本详情
 export async function getVersion(versionId: string) {
-  const response = await api.get(`/version/${versionId}`);
+  const response = await api.get(`/version/${versionId}`, {
+    timeout: 10000,
+  });
   return response.data;
 }
 

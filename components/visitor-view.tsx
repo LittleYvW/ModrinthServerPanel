@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +52,21 @@ const loaderConfig: Record<Loader, { label: string; color: string; bgColor: stri
   forge: { label: 'Forge', color: '#e67e22', bgColor: 'rgba(230, 126, 34, 0.15)' },
   quilt: { label: 'Quilt', color: '#9b59b6', bgColor: 'rgba(155, 89, 182, 0.15)' },
   neoforge: { label: 'NeoForge', color: '#e67e22', bgColor: 'rgba(230, 126, 34, 0.15)' },
+};
+
+const batchContentVar: Variants = {
+  enter: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: 'spring', stiffness: 500, damping: 25 },
+  },
+  exit: {
+    opacity: 0,
+    y: -10,
+    scale: 0.95,
+    transition: { duration: 0.15, ease: 'easeInOut' },
+  },
 };
 
 export function VisitorView() {
@@ -242,44 +257,67 @@ export function VisitorView() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ delay: 0.1 }}
           >
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <motion.div layout whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Button
                 onClick={downloadAll}
                 disabled={batchDownloading}
                 className="bg-[#00d17a] hover:bg-[#00b86b] text-black font-semibold px-6"
               >
-                {batchCompleted ? (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    完成
-                  </>
-                ) : batchDownloading ? (
-                  <>
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                      className="mr-2"
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {batchCompleted ? (
+                    <motion.span
+                      key="both-done"
+                      variants={batchContentVar}
+                      initial="exit"
+                      animate="enter"
+                      exit="exit"
+                      className="flex items-center"
                     >
-                      <Loader2 className="w-4 h-4" />
-                    </motion.div>
-                    <span className="flex items-center gap-1">
-                      <motion.span
-                        key={`both-progress-${batchProgress.current}`}
-                        initial={{ opacity: 0, scale: 1.5, y: 4 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                      <Check className="w-4 h-4 mr-2" />
+                      完成
+                    </motion.span>
+                  ) : batchDownloading ? (
+                    <motion.span
+                      key="both-progress"
+                      variants={batchContentVar}
+                      initial="exit"
+                      animate="enter"
+                      exit="exit"
+                      className="flex items-center"
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                        className="mr-2"
                       >
-                        {batchProgress.current}
-                      </motion.span>
-                      <span>/{batchProgress.total}</span>
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4 mr-2" />
-                    下载全部 ({mods.both.length} 个)
-                  </>
-                )}
+                        <Loader2 className="w-4 h-4" />
+                      </motion.div>
+                      <span className="flex items-center gap-1">
+                        <motion.span
+                          key={`both-progress-${batchProgress.current}`}
+                          initial={{ opacity: 0, scale: 1.5, y: 4 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                        >
+                          {batchProgress.current}
+                        </motion.span>
+                        <span>/{batchProgress.total}</span>
+                      </span>
+                    </motion.span>
+                  ) : (
+                    <motion.span
+                      key="both-default"
+                      variants={batchContentVar}
+                      initial="exit"
+                      animate="enter"
+                      exit="exit"
+                      className="flex items-center"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      下载全部 ({mods.both.length} 个)
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </Button>
             </motion.div>
           </motion.div>
@@ -409,7 +447,7 @@ export function VisitorView() {
                     <Star className="w-4 h-4 text-[#f1c40f] fill-[#f1c40f]" />
                   </CardTitle>
                   {/* 批量下载推荐客户端模组 */}
-                  <motion.div whileTap={{ scale: 0.96 }}>
+                  <motion.div layout whileTap={{ scale: 0.96 }}>
                     <Button
                       size="sm"
                       variant="outline"
@@ -417,38 +455,61 @@ export function VisitorView() {
                       disabled={batchDownloading}
                       className="border-[#f1c40f]/50 text-[#f1c40f] hover:text-[#f1c40f] hover:bg-[#f1c40f]/10 hover:border-[#f1c40f] text-xs h-8"
                     >
-                      {batchCompleted ? (
-                        <>
-                          <Check className="w-3 h-3 mr-1" />
-                          完成
-                        </>
-                      ) : batchDownloading ? (
-                        <>
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-                            className="mr-1"
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {batchCompleted ? (
+                          <motion.span
+                            key="client-done"
+                            variants={batchContentVar}
+                            initial="exit"
+                            animate="enter"
+                            exit="exit"
+                            className="flex items-center"
                           >
-                            <Loader2 className="w-3 h-3" />
-                          </motion.div>
-                          <span className="flex items-center gap-1">
-                            <motion.span
-                              key={`client-progress-${batchProgress.current}`}
-                              initial={{ opacity: 0, scale: 1.5, y: 4 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                            <Check className="w-3 h-3 mr-1" />
+                            完成
+                          </motion.span>
+                        ) : batchDownloading ? (
+                          <motion.span
+                            key="client-progress"
+                            variants={batchContentVar}
+                            initial="exit"
+                            animate="enter"
+                            exit="exit"
+                            className="flex items-center"
+                          >
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                              className="mr-1"
                             >
-                              {batchProgress.current}
-                            </motion.span>
-                            <span>/{batchProgress.total}</span>
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-3 h-3 mr-1" />
-                          下载全部
-                        </>
-                      )}
+                              <Loader2 className="w-3 h-3" />
+                            </motion.div>
+                            <span className="flex items-center gap-1">
+                              <motion.span
+                                key={`client-progress-${batchProgress.current}`}
+                                initial={{ opacity: 0, scale: 1.5, y: 4 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                              >
+                                {batchProgress.current}
+                              </motion.span>
+                              <span>/{batchProgress.total}</span>
+                            </span>
+                          </motion.span>
+                        ) : (
+                          <motion.span
+                            key="client-default"
+                            variants={batchContentVar}
+                            initial="exit"
+                            animate="enter"
+                            exit="exit"
+                            className="flex items-center"
+                          >
+                            <Download className="w-3 h-3 mr-1" />
+                            下载全部
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
                     </Button>
                   </motion.div>
                 </div>
